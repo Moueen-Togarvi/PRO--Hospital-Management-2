@@ -43,8 +43,11 @@ app.config["PASSWORD_RESET_EXPIRY_MINUTES"] = int(os.environ.get("PASSWORD_RESET
 
 try:
     mongo = PyMongo(app)
+    # Trigger a simple operation to verify connection
+    with app.app_context():
+        mongo.db.command('ping')
 except Exception as e:
-    print(f"Error initializing MongoDB: {e}")
+    print(f"CRITICAL: MongoDB initialization failed: {e}")
     mongo = None
 
 serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
@@ -173,6 +176,7 @@ def role_required(roles):
     def decorator(f):
         @login_required
         def wrapper(*args, **kwargs):
+            if not check_db(): return jsonify({"error": "Database not initialized"}), 500
             user = mongo.db.users.find_one({"_id": ObjectId(session['user_id'])})
             if user and user.get('role') in roles:
                 return f(*args, **kwargs)
@@ -2702,6 +2706,7 @@ def add_psych_session_note(session_id):
 
 @app.route('/api/attendance')
 def get_attendance():
+    if not check_db(): return jsonify({"error": "Database error"}), 500
     year = int(request.args.get('year'))
     month = int(request.args.get('month'))
 
@@ -2719,6 +2724,7 @@ def get_attendance():
 
 @app.route('/api/attendance', methods=['POST'])
 def save_attendance():
+    if not check_db(): return jsonify({"error": "Database error"}), 500
     data = request.json
 
     employee_id = data['empId']
