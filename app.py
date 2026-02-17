@@ -30,12 +30,12 @@ limiter = Limiter(
 # --- CONFIGURATION ---
 mongo_uri = os.environ.get("MONGO_URI")
 if not mongo_uri:
-    raise ValueError("MONGO_URI environment variable is required")
+    # Fallback for local dev if .env is missing, but Render will need this set
+    print("WARNING: MONGO_URI environment variable is not set. Database connection will fail.")
+    mongo_uri = "mongodb://localhost:27017/hospital_management" 
 app.config["MONGO_URI"] = mongo_uri
 
-secret_key = os.environ.get("SECRET_KEY")
-if not secret_key:
-    raise ValueError("SECRET_KEY environment variable is required")
+secret_key = os.environ.get("SECRET_KEY", "dev_fallback_secret_key_change_me")
 app.config["SECRET_KEY"] = secret_key
 app.config["GMAIL_USER"] = os.environ.get("GMAIL_USER")
 app.config["GMAIL_APP_PASSWORD"] = os.environ.get("GMAIL_APP_PASSWORD")
