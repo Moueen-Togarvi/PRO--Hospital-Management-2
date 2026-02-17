@@ -35,7 +35,7 @@ if not mongo_uri:
     mongo_uri = "mongodb://localhost:27017/hospital_management" 
 app.config["MONGO_URI"] = mongo_uri
 
-secret_key = os.environ.get("SECRET_KEY", "dev_fallback_secret_key_change_me")
+secret_key = os.environ.get("SECRET_KEY", "06e4b4738ab81f94277a7216b5e79fb24b339f28a6a131391d8d6f8f0a295dc1")
 app.config["SECRET_KEY"] = secret_key
 app.config["GMAIL_USER"] = os.environ.get("GMAIL_USER")
 app.config["GMAIL_APP_PASSWORD"] = os.environ.get("GMAIL_APP_PASSWORD")
