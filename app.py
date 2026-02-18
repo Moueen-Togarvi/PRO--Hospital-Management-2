@@ -29,7 +29,9 @@ limiter = Limiter(
 
 # --- CONFIGURATION ---
 mongo_uri = os.environ.get("MONGO_URI")
-if not mongo_uri:
+if mongo_uri:
+    mongo_uri = mongo_uri.strip() # Handle accidental whitespaces from copy-pasting
+else:
     # Fallback for local dev if .env is missing, but Render will need this set
     print("WARNING: MONGO_URI environment variable is not set. Database connection will fail.")
     mongo_uri = "mongodb://localhost:27017/hospital_management" 
@@ -45,9 +47,11 @@ try:
     mongo = PyMongo(app)
     # Trigger a simple operation to verify connection
     with app.app_context():
-        mongo.db.command('ping')
+        # Using a timeout to ensure startup doesn't hang indefinitely
+        mongo.cx.admin.command('ping', serverSelectionTimeoutMS=5000)
+    print("SUCCESS: Connected to MongoDB.")
 except Exception as e:
-    print(f"CRITICAL: MongoDB initialization failed: {e}")
+    print(f"CRITICAL: MongoDB initialization failed: {type(e).__name__} - {e}")
     mongo = None
 
 serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
@@ -2919,6 +2923,23 @@ def delete_old_balance(id):
 def health_check():
     """Lightweight health check endpoint for uptime monitoring"""
     return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()}), 200
+
+@app.route('/api/db-status', methods=['GET'])
+def db_status():
+    """Detailed database status for troubleshooting"""
+    status = {
+        "connected": check_db(),
+        "has_mongo_obj": mongo is not None,
+        "uri_configured": "MONGO_URI" in os.environ,
+        "timestamp": datetime.now().isoformat()
+    }
+    if mongo:
+        try:
+            mongo.cx.admin.command('ping')
+            status["ping"] = "pong"
+        except Exception as e:
+            status["ping_error"] = str(e)
+    return jsonify(status)
 
 @app.route('/ping', methods=['GET', 'HEAD'])
 def ping():
