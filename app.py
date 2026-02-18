@@ -30,7 +30,18 @@ limiter = Limiter(
 # --- CONFIGURATION ---
 mongo_uri = os.environ.get("MONGO_URI")
 if mongo_uri:
-    mongo_uri = mongo_uri.strip() # Handle accidental whitespaces from copy-pasting
+    mongo_uri = mongo_uri.strip()
+    # Handle accidental label inclusion (e.g., "MONGO_URI: mongodb+srv://...")
+    if mongo_uri.lower().startswith("mongo_uri:"):
+        mongo_uri = mongo_uri[10:].strip()
+    elif mongo_uri.lower().startswith("mongodb:"):
+        # This is already a valid scheme, skip
+        pass
+    elif ":" in mongo_uri and not mongo_uri.startswith("mongodb"):
+        # If there's a colon but it doesn't look like a scheme, it might be a label we missed
+        parts = mongo_uri.split(":", 1)
+        if len(parts) > 1 and "mongodb" in parts[1].lower():
+            mongo_uri = parts[1].strip()
 else:
     # Fallback for local dev if .env is missing, but Render will need this set
     print("WARNING: MONGO_URI environment variable is not set. Database connection will fail.")
