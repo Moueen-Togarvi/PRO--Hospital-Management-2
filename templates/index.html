@@ -1594,31 +1594,31 @@
       });
     }
 
-      async function initApp() {
-        // setLoading(true); // Already visible by default
-        const url = new URL(window.location.href);
-        const tokenFromUrl = url.searchParams.get('reset_token');
-        if (tokenFromUrl) {
-          window.showResetPasswordModal(tokenFromUrl);
-          setLoading(false);
-          return;
-        }
-        
-        const sidebar = document.getElementById('main-sidebar');
-        
-        if (await checkSession()) {
-          updateNavVisibility();
-          if (sidebar) sidebar.style.display = ''; // Show sidebar
-          await fetchPatients();
-          window.navigateTo('dashboard-view');
-        } else {
-          if (sidebar) sidebar.style.display = 'none'; // Ensure hidden
-          window.navigateTo('login-view');
-        }
+    async function initApp() {
+      // setLoading(true); // Already visible by default
+      const url = new URL(window.location.href);
+      const tokenFromUrl = url.searchParams.get('reset_token');
+      if (tokenFromUrl) {
+        window.showResetPasswordModal(tokenFromUrl);
         setLoading(false);
-        // Initialize dual scrollbars after initial render
-        setTimeout(initDualScrollbars, 100);
+        return;
       }
+
+      const sidebar = document.getElementById('main-sidebar');
+
+      if (await checkSession()) {
+        updateNavVisibility();
+        if (sidebar) sidebar.style.display = ''; // Show sidebar
+        await fetchPatients();
+        window.navigateTo('dashboard-view');
+      } else {
+        if (sidebar) sidebar.style.display = 'none'; // Ensure hidden
+        window.navigateTo('login-view');
+      }
+      setLoading(false);
+      // Initialize dual scrollbars after initial render
+      setTimeout(initDualScrollbars, 100);
+    }
 
     async function checkSession() {
       try {
@@ -2599,7 +2599,7 @@
         const emptyMessage = normalizedSearch
           ? 'No patients match your search.'
           : 'No records found.';
-        const colspanCount = isAdmin ? 13 : 10;
+        const colspanCount = isAdmin ? 15 : 10;
         tbody.innerHTML = `
             <tr>
               <td colspan="${colspanCount}" class="p-6 text-center text-gray-400">${emptyMessage}</td>
@@ -2660,11 +2660,19 @@
         }
 
         const fee = formatCurrency(feeValue);
+        const perDayValue = Math.floor(monthlyFeeRaw / 30);
+        const perDay = formatCurrency(perDayValue);
+
         const receivedValue =
           parseInt(String(p.receivedAmount || '0').replace(/,/g, ''), 10) || 0;
         const receivedAmount = formatCurrency(receivedValue);
         const canteenSpentValue = p.canteenSpent || 0;
-        const pendingValue = feeValue - receivedValue + canteenSpentValue;
+        const laundryValue = p.laundryStatus ? (p.laundryAmount || 0) : 0;
+
+        const totalChargesValue = feeValue + canteenSpentValue + laundryValue;
+        const totalCharges = formatCurrency(totalChargesValue);
+
+        const pendingValue = totalChargesValue - receivedValue;
         const pendingAmount = formatCurrency(pendingValue);
         const areaDisplay = p.area || p.address || '-';
         const drugDisplay = p.drug || '-';
@@ -2727,8 +2735,10 @@
                             <td class="px-2 py-2 text-gray-600 whitespace-nowrap">${areaDisplay}</td>
                             <td class="px-2 py-2 text-gray-600 whitespace-nowrap">${drugDisplay}</td>
                             <td class="px-2 py-2 font-semibold text-green-700 whitespace-nowrap">${fee}</td>
+                            <td class="px-2 py-2 text-green-600 whitespace-nowrap text-xs">${perDay}</td>
                             <td class="px-2 py-2 text-center text-gray-700 font-medium whitespace-nowrap text-xs">${daysProgress}</td>
                             <td class="px-2 py-2 text-center text-gray-700 font-medium whitespace-nowrap text-xs">${monthsProgress}</td>
+                            <td class="px-2 py-2 font-bold text-emerald-800 whitespace-nowrap">${totalCharges}</td>
                             <td class="px-2 py-2 font-semibold text-blue-700 whitespace-nowrap">${receivedAmount}</td>
                             <td class="px-2 py-2 font-semibold ${pendingValue > 0 ? 'text-red-600' : 'text-green-700'
             } whitespace-nowrap">${pendingAmount}</td>
@@ -7078,11 +7088,19 @@
               <th id="header-fee" class="px-2 py-2 text-left whitespace-nowrap font-semibold text-xs admin-only-column">
                 Fee
               </th>
+              <th id="header-per-day"
+                class="px-2 py-2 text-left whitespace-nowrap font-semibold text-xs admin-only-column">
+                Per Day
+              </th>
               <th class="px-2 py-2 text-center whitespace-nowrap font-semibold text-xs">
                 Days Done
               </th>
               <th class="px-2 py-2 text-center whitespace-nowrap font-semibold text-xs">
                 Months Done
+              </th>
+              <th id="header-total-charges"
+                class="px-2 py-2 text-left whitespace-nowrap font-semibold text-xs admin-only-column">
+                Total Charges
               </th>
               <th id="header-received"
                 class="px-2 py-2 text-left whitespace-nowrap font-semibold text-xs admin-only-column">

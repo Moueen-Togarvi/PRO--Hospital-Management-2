@@ -466,7 +466,7 @@ def get_dashboard_metrics():
     
     try:
         # 1. Basic Counts
-        total_patients = mongo.db.patients.count_documents({})
+        total_patients = mongo.db.patients.count_documents({'isDischarged': {'$ne': True}})
         admissions_this_month = mongo.db.patients.count_documents({
             'admissionDate': {'$gte': start_of_month.isoformat(), '$lt': end_of_month.isoformat()}
         })
@@ -565,7 +565,7 @@ def debug_dashboard():
     
     try:
         # Get all patients with fees
-        patients = list(mongo.db.patients.find())
+        patients = list(mongo.db.patients.find({'isDischarged': {'$ne': True}}))
         patient_data = []
         for p in patients:
             try:
