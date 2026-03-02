@@ -59,7 +59,7 @@ try:
     # Trigger a simple operation to verify connection
     with app.app_context():
         # Using a timeout to ensure startup doesn't hang indefinitely
-        mongo.cx.admin.command('ping', serverSelectionTimeoutMS=5000)
+        mongo.cx.admin.command('ping')
     print("SUCCESS: Connected to MongoDB.")
 except Exception as e:
     print(f"CRITICAL: MongoDB initialization failed: {type(e).__name__} - {e}")
@@ -516,6 +516,9 @@ def get_dashboard_metrics():
                 fee_str = patient.get('monthlyFee', '0') or '0'
                 fee = calculate_prorated_fee(fee_str, days_elapsed)
                 
+                per_day_rate = int(str(patient.get('perDayRate', '0')).replace(',', '') or '0')
+                fee += per_day_rate * days_elapsed
+                
                 # Get canteen total
                 canteen = canteen_map.get(pid, 0)
                 
@@ -662,6 +665,7 @@ def get_patients():
             p['_id'] = patient_id
             # Ensure monthlyFee is present for canteen view logic
             p['monthlyFee'] = p.get('monthlyFee', '0')
+            p['perDayRate'] = p.get('perDayRate', '0')
             p['photo1'] = p.get('photo1', '')
             p['photo2'] = p.get('photo2', '')
             p['photo3'] = p.get('photo3', '')
@@ -686,6 +690,7 @@ def add_patient():
         data['created_at'] = datetime.now()
         data['notes'] = [] # General Notes (Legacy)
         data['monthlyFee'] = data.get('monthlyFee', '0')
+        data['perDayRate'] = data.get('perDayRate', '0')
         data['monthlyAllowance'] = data.get('monthlyAllowance', '3000') # Default allowance
         data['receivedAmount'] = data.get('receivedAmount', '0')  # New field
         data['drug'] = data.get('drug', '')  # New field
@@ -720,7 +725,7 @@ def update_patient(id):
         current_role = session.get('role')
         if current_role != 'Admin':
             # Remove sensitive fields for non-admin users
-            sensitive_fields = ['monthlyFee', 'monthlyAllowance', 'laundryStatus', 
+            sensitive_fields = ['monthlyFee', 'perDayRate', 'monthlyAllowance', 'laundryStatus', 
                               'laundryAmount', 'cnic', 'contactNo', 'guardianName', 
                               'relation', 'address']
             for field in sensitive_fields:
@@ -1199,24 +1204,31 @@ def save_canteen_old_balance():
         year = int(data.get('year'))
         old_balance = int(data.get('old_balance', 0))
         
-        # Upsert the override
-        mongo.db.canteen_balance_overrides.update_one(
-            {
+        # Upsert or delete the override
+        if old_balance == 0:
+            mongo.db.canteen_balance_overrides.delete_one({
                 'patient_id': ObjectId(patient_id),
                 'month': month,
                 'year': year
-            },
-            {
-                '$set': {
-                    'old_balance': old_balance,
-                    'updated_at': datetime.now(),
-                    'updated_by': session.get('username')
-                }
-            },
-            upsert=True
-        )
-        
-        return jsonify({"message": "Old balance updated"})
+            })
+            return jsonify({"message": "Old balance override removed"})
+        else:
+            mongo.db.canteen_balance_overrides.update_one(
+                {
+                    'patient_id': ObjectId(patient_id),
+                    'month': month,
+                    'year': year
+                },
+                {
+                    '$set': {
+                        'old_balance': old_balance,
+                        'updated_at': datetime.now(),
+                        'updated_by': session.get('username')
+                    }
+                },
+                upsert=True
+            )
+            return jsonify({"message": "Old balance updated"})
     except Exception as e:
         print(f"Save Old Balance Error: {e}")
         return jsonify({"error": str(e)}), 500
@@ -1237,12 +1249,21 @@ def save_canteen_daily_entry():
         amount = int(data['amount'])
         entry_type = data['entry_type']  # 'daily' or 'other'
         
-        # Check if entry already exists
-        existing_entry = mongo.db.canteen_sales.find_one({
+        start_of_day = entry_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day = start_of_day + timedelta(days=1)
+        
+        # Check if entry already exists within the day
+        query = {
             'patient_id': patient_id,
-            'date': entry_date,
-            'entry_type': entry_type
-        })
+            'date': {'$gte': start_of_day, '$lt': end_of_day}
+        }
+        if entry_type == 'other':
+            query['entry_type'] = 'other'
+        else:
+            # Match explicitly 'daily' OR older legacy items that lacked entry_type
+            query['$or'] = [{'entry_type': 'daily'}, {'entry_type': {'$exists': False}}]
+            
+        existing_entry = mongo.db.canteen_sales.find_one(query)
         
         # Role-based permission check
         user_role = session.get('role')
@@ -1254,16 +1275,20 @@ def save_canteen_daily_entry():
                 # Canteen staff cannot edit existing entries
                 return jsonify({"error": "Canteen staff cannot edit existing entries"}), 403
             elif user_role == 'Admin':
-                # Admin can edit
-                mongo.db.canteen_sales.update_one(
-                    {'_id': existing_entry['_id']},
-                    {'$set': {
-                        'amount': amount,
-                        'edited_by': username,
-                        'edited_at': datetime.now()
-                    }}
-                )
-                return jsonify({"message": "Entry updated", "id": str(existing_entry['_id'])}), 200
+                # Admin can edit. If 0, delete it.
+                if amount == 0:
+                    mongo.db.canteen_sales.delete_one({'_id': existing_entry['_id']})
+                    return jsonify({"message": "Entry removed as amount was 0", "id": str(existing_entry['_id'])}), 200
+                else:
+                    mongo.db.canteen_sales.update_one(
+                        {'_id': existing_entry['_id']},
+                        {'$set': {
+                            'amount': amount,
+                            'edited_by': username,
+                            'edited_at': datetime.now()
+                        }}
+                    )
+                    return jsonify({"message": "Entry updated", "id": str(existing_entry['_id'])}), 200
         else:
             # New entry - both Admin and Canteen can add
             new_entry = {
@@ -1541,7 +1566,7 @@ def get_accounts_summary():
         # Get all patients - Added 'isDischarged' to projection
         patients = list(mongo.db.patients.find({}, {
             'name': 1, 'fatherName': 1, 'admissionDate': 1, 
-            'monthlyFee': 1, 'address': 1, 'age': 1,
+            'monthlyFee': 1, 'perDayRate': 1, 'address': 1, 'age': 1,
             'laundryStatus': 1, 'laundryAmount': 1, 'receivedAmount': 1,
             'isDischarged': 1
         }))
@@ -1571,9 +1596,12 @@ def get_accounts_summary():
                 except:
                     days_elapsed = 0
             
-            # Get monthly fee and calculate prorated fee
+            # Get fees and calculate prorated and per day fees
             monthly_fee = p.get('monthlyFee', '0')
             calculated_fee = calculate_prorated_fee(monthly_fee, days_elapsed)
+            
+            per_day_rate = int(str(p.get('perDayRate', '0')).replace(',', '') or '0')
+            calculated_fee += per_day_rate * days_elapsed
             
             summary.append({
                 'id': pid,
@@ -2340,9 +2368,13 @@ def generate_discharge_bill(id):
         canteen_result = list(mongo.db.canteen_sales.aggregate(pipeline))
         canteen_total = canteen_result[0]['total_sales'] if canteen_result else 0
         
-        # Parse financial data and calculate prorated fee
+        # Parse financial data and calculate prorated/per-day fee
         monthly_fee_raw = patient.get('monthlyFee', '0')
         monthly_fee = calculate_prorated_fee(monthly_fee_raw, days_elapsed)
+        
+        per_day_rate = int(str(patient.get('perDayRate', '0')).replace(',', '') or '0')
+        monthly_fee += per_day_rate * days_elapsed
+        
         laundry_amount = patient.get('laundryAmount', 0) if patient.get('laundryStatus', False) else 0
         received_amount = int(str(patient.get('receivedAmount', '0')).replace(',', '') or '0')
         
