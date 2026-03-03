@@ -1218,119 +1218,28 @@
       color: #9ca3af !important;
     }
 
-    /* --- PATIENTS DIRECTORY COMPACT TABLE FIT --- */
+    /* --- PATIENTS DIRECTORY SCROLLABLE TABLE --- */
     #patients-view .kpi-card {
-      overflow-x: hidden !important;
+      overflow: visible !important;
+    }
+
+    #patients-view .overflow-x-auto {
+      overflow-x: auto !important;
     }
 
     #patients-view table {
-      width: 100%;
-      table-layout: fixed;
+      width: auto;
+      min-width: 100%;
+      table-layout: auto;
     }
 
-    /* Serial No */
-    #patients-table-headers th:nth-child(1),
-    #patients-table-body td:nth-child(1) {
-      width: 80px;
-      min-width: 70px;
+    /* All cells: prevent wrapping, let table expand */
+    #patients-table-headers th,
+    #patients-table-body td {
+      white-space: nowrap !important;
+      word-break: normal !important;
     }
 
-    /* Name */
-    #patients-table-headers th:nth-child(2),
-    #patients-table-body td:nth-child(2) {
-      width: 10%;
-      min-width: 70px;
-      word-break: break-word;
-      white-space: normal;
-    }
-
-    /* Father Name */
-    #patients-table-headers th:nth-child(3),
-    #patients-table-body td:nth-child(3) {
-      width: 10%;
-      min-width: 70px;
-      word-break: break-word;
-      white-space: normal;
-    }
-
-    /* Admission Date */
-    #patients-table-headers th:nth-child(4),
-    #patients-table-body td:nth-child(4) {
-      width: 80px;
-      min-width: 70px;
-      white-space: nowrap;
-    }
-
-    /* Contact */
-    #patients-table-headers th:nth-child(5),
-    #patients-table-body td:nth-child(5) {
-      width: 80px;
-      min-width: 70px;
-      white-space: nowrap;
-    }
-
-    /* Area */
-    #patients-table-headers th:nth-child(6),
-    #patients-table-body td:nth-child(6) {
-      width: 7%;
-      min-width: 50px;
-      word-break: break-word;
-      white-space: normal;
-    }
-
-    /* Monthly Fee (admin) */
-    #patients-table-headers th:nth-child(7),
-    #patients-table-body td:nth-child(7) {
-      width: 7%;
-      min-width: 60px;
-      white-space: nowrap;
-    }
-
-    /* Days Done */
-    #patients-table-headers th:nth-child(8),
-    #patients-table-body td:nth-child(8) {
-      width: 55px;
-      min-width: 50px;
-      white-space: nowrap;
-    }
-
-    /* Months Done */
-    #patients-table-headers th:nth-child(9),
-    #patients-table-body td:nth-child(9) {
-      width: 6%;
-      min-width: 55px;
-      white-space: nowrap;
-    }
-
-    /* Total Charges (admin) */
-    #patients-table-headers th:nth-child(10),
-    #patients-table-body td:nth-child(10) {
-      width: 8%;
-      min-width: 70px;
-      white-space: nowrap;
-    }
-
-    /* Received (admin) */
-    #patients-table-headers th:nth-child(11),
-    #patients-table-body td:nth-child(11) {
-      width: 8%;
-      min-width: 70px;
-      white-space: nowrap;
-    }
-
-    /* Pending (admin) */
-    #patients-table-headers th:nth-child(12),
-    #patients-table-body td:nth-child(12) {
-      width: 9%;
-      min-width: 80px;
-    }
-
-    /* Actions */
-    #patients-table-headers th:last-child,
-    #patients-table-body td:last-child {
-      width: 80px;
-      min-width: 70px;
-    }
 
     /* --- FIX FOR CANTEEN TABLE DISCHARGED ROWS --- */
     #canteen-breakdown-body tr.discharged-row,
@@ -2876,28 +2785,28 @@
 
         if (isAdmin) {
           tr.innerHTML = `<td class="px-1 py-2 font-medium text-gray-700 whitespace-nowrap text-xs">${serialNo}</td>
-                            <td class="px-1 py-2 font-medium">${p.name || '-'}</td>
-                            <td class="px-1 py-2 text-gray-600">${p.fatherName || '-'}</td>
+                            <td class="px-1 py-2 font-medium whitespace-nowrap">${p.name || '-'}</td>
+                            <td class="px-1 py-2 text-gray-600 whitespace-nowrap">${p.fatherName || '-'}</td>
                             <td class="px-1 py-2 text-gray-600 whitespace-nowrap text-xs">${formattedAdmissionDate}</td>
                             <td class="px-1 py-2 text-gray-600 whitespace-nowrap">${p.contactNo || '-'}</td>
-                            <td class="px-1 py-2 text-gray-600">${areaDisplay}</td>
+                            <td class="px-1 py-2 text-gray-600 whitespace-nowrap">${areaDisplay}</td>
                             <td class="px-1 py-2 whitespace-nowrap text-xs font-medium text-gray-900">${fee}</td>
                             <td class="px-1 py-2 text-center text-gray-700 font-medium whitespace-nowrap text-xs">${daysProgress}</td>
                             <td class="px-1 py-2 text-center text-gray-700 font-medium whitespace-nowrap text-xs">${monthsProgress}</td>
                             <td class="px-1 py-2 font-bold text-emerald-800 whitespace-nowrap">${totalCharges}</td>
                             <td class="px-1 py-2 font-semibold text-blue-700 whitespace-nowrap">${receivedAmount}</td>
-                            <td class="px-1 py-2"><span class="${pendingAmountStyle} font-semibold text-xs">${pendingAmountText}</span></td>
-                            <td class="px-1 py-2 text-right">${actionControls}</td>`;
+                            <td class="px-1 py-2 whitespace-nowrap"><span class="${pendingAmountStyle} font-semibold text-xs">${pendingAmountText}</span></td>
+                            <td class="px-1 py-2 text-right whitespace-nowrap">${actionControls}</td>`;
         } else {
           tr.innerHTML = `<td class="px-1 py-2 font-medium text-gray-700 whitespace-nowrap text-xs">${serialNo}</td>
-                            <td class="px-1 py-2 font-medium">${p.name || '-'}</td>
-                            <td class="px-1 py-2 text-gray-600">${p.fatherName || '-'}</td>
+                            <td class="px-1 py-2 font-medium whitespace-nowrap">${p.name || '-'}</td>
+                            <td class="px-1 py-2 text-gray-600 whitespace-nowrap">${p.fatherName || '-'}</td>
                             <td class="px-1 py-2 text-gray-600 whitespace-nowrap text-xs">${formattedAdmissionDate}</td>
                             <td class="px-1 py-2 text-gray-600 whitespace-nowrap">${p.contactNo || '-'}</td>
-                            <td class="px-1 py-2 text-gray-600">${areaDisplay}</td>
+                            <td class="px-1 py-2 text-gray-600 whitespace-nowrap">${areaDisplay}</td>
                             <td class="px-1 py-2 text-center text-gray-700 font-medium whitespace-nowrap text-xs">${daysProgress}</td>
                             <td class="px-1 py-2 text-center text-gray-700 font-medium whitespace-nowrap text-xs">${monthsProgress}</td>
-                            <td class="px-1 py-2 text-right">${actionControls}</td>`;
+                            <td class="px-1 py-2 text-right whitespace-nowrap">${actionControls}</td>`;
         }
         tbody.appendChild(tr);
       });
@@ -3423,7 +3332,7 @@
 
           tbody.innerHTML += `
         <tr class="border-b transition ${rowClass}">
-            <td class="px-6 py-4 font-medium whitespace-nowrap">
+            <td class="px-6 py-4 font-medium whitespace-nowrap sticky left-0 bg-white z-10 border-r shadow-sm">
                 ${p.name} ${statusBadge}
             </td>
             <td class="px-6 py-4 whitespace-nowrap">${p.fatherName}</td>
@@ -7030,7 +6939,7 @@
             </h4>
           </div>
           <div class="bg-white rounded-xl shadow-lg border border-emerald-100 overflow-hidden">
-            <div class="w-full">
+            <div class="w-full overflow-x-auto">
               <table class="w-full divide-y divide-emerald-100 relative" style="table-layout: fixed">
                 <thead class="bg-emerald-600 text-white">
                   <tr id="day-header-row"></tr>
@@ -7048,7 +6957,7 @@
             </h4>
           </div>
           <div class="bg-white rounded-xl shadow-lg border border-indigo-100 overflow-hidden">
-            <div class="w-full">
+            <div class="w-full overflow-x-auto">
               <table class="w-full divide-y divide-indigo-100 relative" style="table-layout: fixed">
                 <thead class="bg-indigo-900 text-white">
                   <tr id="night-header-row"></tr>
@@ -7162,20 +7071,22 @@
         </div>
       </div>
 
-      <div class="kpi-card overflow-x-auto" style="padding: 0; border-color: rgba(16, 185, 129, 0.2)">
-        <table class="min-w-full divide-y divide-emerald-100">
-          <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
-            <tr>
-              <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Date</th>
-              <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Category</th>
-              <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Type</th>
-              <th class="px-6 py-3 text-right whitespace-nowrap font-semibold">Amount</th>
-              <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Note</th>
-              <th class="px-6 py-3 text-center whitespace-nowrap font-semibold">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="expenses-table-body" class="divide-y divide-emerald-50"></tbody>
-        </table>
+      <div class="kpi-card" style="padding: 0; border-color: rgba(16, 185, 129, 0.2)">
+        <div class="overflow-x-auto w-full">
+          <table class="min-w-full divide-y divide-emerald-100">
+            <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
+              <tr>
+                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Date</th>
+                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Category</th>
+                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Type</th>
+                <th class="px-6 py-3 text-right whitespace-nowrap font-semibold">Amount</th>
+                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Note</th>
+                <th class="px-6 py-3 text-center whitespace-nowrap font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="expenses-table-body" class="divide-y divide-emerald-50"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -7183,21 +7094,25 @@
       <h2 class="text-xl md:text-2xl font-bold mb-6 text-green-800">
         <i class="fas fa-file-invoice-dollar mr-2"></i>Accounts & Discharge
       </h2>
-      <div class="kpi-card overflow-x-auto" style="padding: 0; border-color: rgba(16, 185, 129, 0.2)">
-        <table class="min-w-full divide-y divide-emerald-100 overflow-x-auto">
-          <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
-            <tr>
-              <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Patient Name</th>
-              <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Father Name</th>
-              <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Admission</th>
-              <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Total Bill</th>
-              <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Received</th>
-              <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Balance Due</th>
-              <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="accounts-table-body" class="divide-y divide-emerald-50"></tbody>
-        </table>
+      <div class="kpi-card" style="padding: 0; border-color: rgba(16, 185, 129, 0.2)">
+        <div class="overflow-x-auto w-full">
+          <table class="min-w-full divide-y divide-emerald-100 overflow-x-auto">
+            <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
+              <tr>
+                <th
+                  class="px-6 py-3 text-left whitespace-nowrap font-semibold sticky left-0 bg-emerald-600 z-20 shadow-sm">
+                  Patient Name</th>
+                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Father Name</th>
+                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Admission</th>
+                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Total Bill</th>
+                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Received</th>
+                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Balance Due</th>
+                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="accounts-table-body" class="divide-y divide-emerald-50"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -7226,30 +7141,34 @@
           </button>
         </div>
       </div>
-      <div class="kpi-card" style="padding: 0; border-color: rgba(16, 185, 129, 0.2); overflow: hidden;">
-        <table class="w-full divide-y divide-emerald-100" style="font-size: 0.72rem;">
-          <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
-            <tr id="patients-table-headers">
-              <th class="px-2 py-2 text-left font-semibold text-xs">Serial No</th>
-              <th class="px-2 py-2 text-left font-semibold text-xs">Name</th>
-              <th class="px-2 py-2 text-left font-semibold text-xs">Father</th>
-              <th class="px-2 py-2 text-left font-semibold text-xs whitespace-nowrap">Admission</th>
-              <th id="header-contact" class="px-2 py-2 text-left font-semibold text-xs whitespace-nowrap">Contact</th>
-              <th class="px-2 py-2 text-left font-semibold text-xs">Area</th>
-              <th id="header-fee" class="px-2 py-2 text-left font-semibold text-xs admin-only-column whitespace-nowrap">
-                Fee/Mo</th>
-              <th class="px-2 py-2 text-center font-semibold text-xs whitespace-nowrap">Days</th>
-              <th class="px-2 py-2 text-center font-semibold text-xs whitespace-nowrap">Months</th>
-              <th id="header-total-charges"
-                class="px-2 py-2 text-left font-semibold text-xs admin-only-column whitespace-nowrap">Total</th>
-              <th id="header-received"
-                class="px-2 py-2 text-left font-semibold text-xs admin-only-column whitespace-nowrap">Received</th>
-              <th id="header-pending" class="px-2 py-2 text-left font-semibold text-xs admin-only-column">Pending</th>
-              <th class="px-2 py-2 text-right font-semibold text-xs">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="patients-table-body" class="divide-y divide-emerald-50"></tbody>
-        </table>
+      <div class="kpi-card" style="padding: 0; border-color: rgba(16, 185, 129, 0.2);">
+        <div class="overflow-x-auto w-full">
+          <table class="min-w-full divide-y divide-emerald-100" style="font-size: 0.72rem;">
+            <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
+              <tr id="patients-table-headers">
+                <th class="px-2 py-2 text-left font-semibold text-xs whitespace-nowrap">Serial No</th>
+                <th class="px-2 py-2 text-left font-semibold text-xs whitespace-nowrap">Name</th>
+                <th class="px-2 py-2 text-left font-semibold text-xs whitespace-nowrap">Father</th>
+                <th class="px-2 py-2 text-left font-semibold text-xs whitespace-nowrap">Admission</th>
+                <th id="header-contact" class="px-2 py-2 text-left font-semibold text-xs whitespace-nowrap">Contact</th>
+                <th class="px-2 py-2 text-left font-semibold text-xs whitespace-nowrap">Area</th>
+                <th id="header-fee"
+                  class="px-2 py-2 text-left font-semibold text-xs admin-only-column whitespace-nowrap">
+                  Fee/Mo</th>
+                <th class="px-2 py-2 text-center font-semibold text-xs whitespace-nowrap">Days</th>
+                <th class="px-2 py-2 text-center font-semibold text-xs whitespace-nowrap">Months</th>
+                <th id="header-total-charges"
+                  class="px-2 py-2 text-left font-semibold text-xs admin-only-column whitespace-nowrap">Total</th>
+                <th id="header-received"
+                  class="px-2 py-2 text-left font-semibold text-xs admin-only-column whitespace-nowrap">Received</th>
+                <th id="header-pending"
+                  class="px-2 py-2 text-left font-semibold text-xs admin-only-column whitespace-nowrap">Pending</th>
+                <th class="px-2 py-2 text-right font-semibold text-xs whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="patients-table-body" class="divide-y divide-emerald-50"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -7569,18 +7488,20 @@
             </button>
           </form>
         </div>
-        <div class="col-span-2 kpi-card overflow-x-auto" style="padding: 0; border-color: rgba(16, 185, 129, 0.2)">
-          <table class="min-w-full divide-y divide-emerald-100">
-            <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
-              <tr>
-                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Name</th>
-                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">User</th>
-                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Role</th>
-                <th class="px-6 py-3 whitespace-nowrap font-semibold text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody id="user-table-body" class="divide-y divide-emerald-50"></tbody>
-          </table>
+        <div class="col-span-2 kpi-card" style="padding: 0; border-color: rgba(16, 185, 129, 0.2)">
+          <div class="overflow-x-auto w-full">
+            <table class="min-w-full divide-y divide-emerald-100">
+              <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
+                <tr>
+                  <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Name</th>
+                  <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">User</th>
+                  <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Role</th>
+                  <th class="px-6 py-3 whitespace-nowrap font-semibold text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody id="user-table-body" class="divide-y divide-emerald-50"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
