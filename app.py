@@ -694,7 +694,26 @@ def add_patient():
             data['laundryAmount'] = 0  # 0 if not enabled
         
         result = mongo.db.patients.insert_one(data)
-        return jsonify({"message": "Success", "id": str(result.inserted_id)}), 201
+        patient_id = str(result.inserted_id)
+
+        # Auto-log initial payment as an expense
+        try:
+            initial_received = int(str(data.get('receivedAmount', '0')).replace(',', ''))
+            if initial_received > 0:
+                mongo.db.expenses.insert_one({
+                    'type': 'incoming',
+                    'amount': initial_received,
+                    'category': 'Patient Fee',
+                    'note': f"Initial Advance from {data.get('name')} (Admission)",
+                    'payment_method': 'Cash/Initial',
+                    'patient_id': patient_id,
+                    'date': datetime.now(),
+                    'recorded_by': session.get('username', 'Admin'),
+                    'auto': True
+                })
+        except: pass
+
+        return jsonify({"message": "Success", "id": patient_id}), 201
     except Exception as e:
         print(f"DB Insert Error: {e}")
         return jsonify({"error": str(e)}), 500

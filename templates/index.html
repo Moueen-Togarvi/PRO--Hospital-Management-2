@@ -157,7 +157,9 @@
 
       #printable-discharge-slip,
       #printable-discharge-slip * {
-        visibility: visible;
+        visibility: visible !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
 
       /* Ensure Font Awesome icons are visible */
@@ -2845,8 +2847,9 @@
           return p;
         });
 
-        printDischargeSlip(id);
+        await printDischargeSlip(id);
         renderPatientsTable(patientsData);
+        if (typeof renderAccounts === 'function') renderAccounts();
         showSuccessModal('Patient discharged and saved.');
       } catch (err) {
         console.error('Discharge error:', err);
@@ -3346,18 +3349,25 @@
             </td>
 
             <td class="px-6 py-4 font-medium whitespace-nowrap">
-                ${formatCurrency(received)}
+                <div class="text-emerald-700 font-bold">${formatCurrency(received)}</div>
+                <hr class="my-1 border-gray-100">
+                <div class="text-[10px] uppercase opacity-60">Advance Total</div>
             </td>
 
             <td class="px-6 py-4 whitespace-nowrap ${balanceClass}">
-                ${formatCurrency(balanceDue)}
+                ${balanceDue < 0 ? '<span class="text-[10px] uppercase block">Refund</span>' : ''}
+                ${formatCurrency(Math.abs(balanceDue))}
             </td>
 
             <td class="px-6 py-4">  
-                <button onclick="printDischargeSlip('${p.id
-            }')" class="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1 rounded text-sm shadow-md transition font-semibold">
-                    <i class="fas fa-print mr-1"></i> Discharge
-                </button>
+                ${p.isDischarged
+              ? `<button onclick="printDischargeSlip('${p.id}')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm border border-gray-300 transition font-semibold">
+                        <i class="fas fa-print mr-1"></i> Print Invoice
+                       </button>`
+              : `<button onclick="handleDischargeFromTable('${p.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-sm shadow-md transition font-semibold">
+                        <i class="fas fa-sign-out-alt mr-1"></i> Discharge
+                       </button>`
+            }
             </td>
         </tr>`;
         });
@@ -3445,11 +3455,28 @@
 
       let calculatedReceived = 0;
 
-      if (paymentHistory.length === 0) {
-        // If NO history found, we default to 0 to prevent the "5 million" error.
+      // RECONCILIATION: Compare history sum with patient.receivedAmount
+      const patientTotalReceived = parse(p.receivedAmount);
+      const historySum = paymentHistory.reduce((sum, rec) => sum + parse(rec.amount), 0);
+
+      // If history is missing some amount that is in the patient record, add as "Opening Balance"
+      if (patientTotalReceived > historySum + 10) {
+        const gap = patientTotalReceived - historySum;
+        const gapRow = document.createElement('tr');
+        gapRow.className = 'border-b bg-emerald-50 text-xs italic';
+        gapRow.innerHTML = `
+            <td class="p-2">${p.admissionDate || '-'}</td>
+            <td class="p-2 uppercase font-semibold text-emerald-700">Advance</td>
+            <td class="p-2 text-emerald-700">Initial Patient Advance / Opening Balance</td>
+            <td class="p-2 text-right font-mono font-bold">${fmt(gap)}</td>
+        `;
+        historyBody.appendChild(gapRow);
+        calculatedReceived += gap;
+      }
+
+      if (paymentHistory.length === 0 && calculatedReceived === 0) {
         historyBody.innerHTML =
           '<tr><td colspan="4" class="p-3 text-center text-gray-500 italic text-xs">No payment records found.</td></tr>';
-        calculatedReceived = 0;
       } else {
         paymentHistory.forEach((rec) => {
           const amount = parse(rec.amount);
@@ -3459,7 +3486,7 @@
           row.className = 'border-b hover:bg-gray-50 text-xs';
           row.innerHTML = `
                 <td class="p-2">${rec.date}</td>
-                <td class="p-2 uppercase font-semibold text-gray-600">${rec.method}</td>
+                <td class="p-2 uppercase font-semibold text-gray-600">${rec.payment_method || rec.method || 'Cash'}</td>
                 <td class="p-2 text-gray-500 truncate max-w-[150px]">${rec.note}</td>
                 <td class="p-2 text-right font-mono">${fmt(amount)}</td>
             `;
@@ -3500,16 +3527,23 @@
       // Balance Styling for the bottom box
       const balEl = document.getElementById('ds-net-balance');
       const labelEl = balEl.previousElementSibling;
+      const containerEl = document.getElementById('ds-net-balance-container');
 
       if (balance > 0) {
-        balEl.className = 'text-3xl font-mono font-bold text-red-600'; // Due
+        balEl.className = 'text-3xl font-mono font-bold text-white'; // Due
+        containerEl.className = 'bg-red-600 text-white p-3 rounded-lg shadow-lg text-center w-64 transition-all duration-300 ring-4 ring-red-100';
         labelEl.innerText = 'NET PAYABLE BALANCE';
+        labelEl.className = 'text-xs uppercase tracking-widest text-red-100 mb-1';
       } else if (balance < 0) {
-        balEl.className = 'text-3xl font-mono font-bold text-emerald-600'; // Refund
+        balEl.className = 'text-3xl font-mono font-bold text-white'; // Refund
+        containerEl.className = 'bg-emerald-600 text-white p-3 rounded-lg shadow-lg text-center w-64 transition-all duration-300 ring-4 ring-emerald-100';
         labelEl.innerText = 'REFUNDABLE BALANCE';
+        labelEl.className = 'text-xs uppercase tracking-widest text-emerald-100 mb-1';
       } else {
-        balEl.className = 'text-3xl font-mono font-bold text-gray-800'; // Cleared
+        balEl.className = 'text-3xl font-mono font-bold text-white'; // Cleared
+        containerEl.className = 'bg-gray-800 text-white p-3 rounded-lg shadow-lg text-center w-64 transition-all duration-300';
         labelEl.innerText = 'NET BALANCE (CLEARED)';
+        labelEl.className = 'text-xs uppercase tracking-widest text-gray-300 mb-1';
       }
 
       // 8. Trigger Print
@@ -7159,8 +7193,8 @@
                 <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Father Name</th>
                 <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Admission</th>
                 <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Total Bill</th>
-                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Received</th>
-                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Balance Due</th>
+                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Advance Received</th>
+                <th class="px-6 py-3 text-left whitespace-nowrap font-semibold text-center">Refund / Balance Due</th>
                 <th class="px-6 py-3 text-left whitespace-nowrap font-semibold">Actions</th>
               </tr>
             </thead>
@@ -8451,7 +8485,7 @@
   </script>
 
   <div id="printable-discharge-slip" class="hidden bg-white p-6 m-auto text-gray-800"
-    style="width: 148mm; height: 180mm; box-sizing: border-box; position: relative; overflow: hidden;">
+    style="width: 148mm; min-height: 210mm; height: auto; box-sizing: border-box; position: relative;">
     <!-- TABLE Layout for absolute stability in Header -->
     <table class="w-full border-b-2 border-emerald-600 mb-4" style="border-collapse: collapse">
       <tr style="border: none !important">
@@ -8545,23 +8579,22 @@
           <td class="p-3 text-right">GROSS TOTAL BILL:</td>
           <td class="p-3 text-right font-mono text-lg" id="ds-gross-total">0</td>
         </tr>
-      </tbody>
-    </table>
-
-    <!-- New Summary Table for Clarity -->
-    <table class="w-full text-sm border-collapse mb-4 mt-4">
-      <tbody class="border border-gray-200">
-        <tr class="border-b">
-          <td class="p-3 w-1/2">Total Advance / Payments Received</td>
+        <tr class="border-t border-gray-300">
+          <td class="p-3">Total Advance / Payments Received</td>
           <td class="p-3 text-right font-mono text-green-700 font-bold" id="ds-summary-received">0</td>
         </tr>
-        <tr class="border-b bg-red-50" id="ds-due-row">
-          <td class="p-3">Remaining Balance Due</td>
-          <td class="p-3 text-right font-mono text-red-700 font-bold" id="ds-summary-due">0</td>
+        <tr id="ds-due-row" class="hidden"
+          style="background-color: #fee2e2 !important; border: 2px solid #ef4444 !important;">
+          <td class="p-3 font-bold" style="color: #991b1b !important; font-size: 14px;">REMAINING BALANCE DUE (PAYABLE)
+          </td>
+          <td class="p-3 text-right font-mono font-bold" style="color: #b91c1c !important; font-size: 20px;"
+            id="ds-summary-due">0</td>
         </tr>
-        <tr class="border-b bg-emerald-50" id="ds-refund-row">
-          <td class="p-3">Refundable Amount</td>
-          <td class="p-3 text-right font-mono text-emerald-700 font-bold" id="ds-summary-refund">0</td>
+        <tr id="ds-refund-row" class="hidden"
+          style="background-color: #d1fae5 !important; border: 2px solid #10b981 !important;">
+          <td class="p-3 font-bold" style="color: #065f46 !important; font-size: 14px;">REFUNDABLE AMOUNT (CREDIT)</td>
+          <td class="p-3 text-right font-mono font-bold" style="color: #047857 !important; font-size: 20px;"
+            id="ds-summary-refund">0</td>
         </tr>
       </tbody>
     </table>
@@ -8581,14 +8614,14 @@
       <tbody id="ds-payment-history-body" class="border border-gray-200"></tbody>
       <tfoot>
         <tr class="bg-gray-100 font-bold border-t-2 border-gray-300">
-          <td colspan="3" class="p-1 text-right">TOTAL RECEIVED:</td>
+          <td colspan="3" class="p-1 text-right italic uppercase text-[10px]">Total Advance Payments Received:</td>
           <td class="p-1 text-right font-mono text-green-700" id="ds-total-received">0</td>
         </tr>
       </tfoot>
     </table>
 
     <div class="flex justify-end mt-3 mb-6">
-      <div class="bg-gray-900 text-white p-3 rounded-lg shadow-lg text-center w-64">
+      <div id="ds-net-balance-container" class="bg-gray-900 text-white p-3 rounded-lg shadow-lg text-center w-64">
         <div class="text-xs uppercase tracking-widest text-gray-400 mb-1">
           Net Payable Balance
         </div>
