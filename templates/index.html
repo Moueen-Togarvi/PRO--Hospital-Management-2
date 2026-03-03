@@ -3471,21 +3471,45 @@
       const balance = gross - calculatedReceived;
 
       document.getElementById('ds-total-received').innerText = fmt(calculatedReceived);
-      document.getElementById('ds-net-balance').innerText = `PKR ${fmt(balance)}`;
+      document.getElementById('ds-summary-received').innerText = fmt(calculatedReceived);
 
-      // Balance Styling
+      const dueEl = document.getElementById('ds-summary-due');
+      const refundEl = document.getElementById('ds-summary-refund');
+      const dueRow = document.getElementById('ds-due-row');
+      const refundRow = document.getElementById('ds-refund-row');
+
+      if (balance > 0) {
+        dueEl.innerText = fmt(balance);
+        refundEl.innerText = '0';
+        dueRow.classList.remove('hidden');
+        refundRow.classList.add('hidden');
+      } else if (balance < 0) {
+        dueEl.innerText = '0';
+        refundEl.innerText = fmt(Math.abs(balance));
+        dueRow.classList.add('hidden');
+        refundRow.classList.remove('hidden');
+      } else {
+        dueEl.innerText = '0';
+        refundEl.innerText = '0';
+        dueRow.classList.add('hidden');
+        refundRow.classList.add('hidden');
+      }
+
+      document.getElementById('ds-net-balance').innerText = `PKR ${fmt(Math.abs(balance))}`;
+
+      // Balance Styling for the bottom box
       const balEl = document.getElementById('ds-net-balance');
       const labelEl = balEl.previousElementSibling;
 
       if (balance > 0) {
-        balEl.className = 'text-3xl font-mono font-bold text-red-600'; // Debit/Due
+        balEl.className = 'text-3xl font-mono font-bold text-red-600'; // Due
         labelEl.innerText = 'NET PAYABLE BALANCE';
       } else if (balance < 0) {
-        balEl.className = 'text-3xl font-mono font-bold text-emerald-600'; // Credit/Surplus
+        balEl.className = 'text-3xl font-mono font-bold text-emerald-600'; // Refund
         labelEl.innerText = 'REFUNDABLE BALANCE';
       } else {
         balEl.className = 'text-3xl font-mono font-bold text-gray-800'; // Cleared
-        labelEl.innerText = 'NET BALANCE';
+        labelEl.innerText = 'NET BALANCE (CLEARED)';
       }
 
       // 8. Trigger Print
@@ -8517,9 +8541,27 @@
           <td class="p-3">Laundry / Other Services</td>
           <td class="p-3 text-right font-mono" id="ds-total-laundry">0</td>
         </tr>
-        <tr class="bg-gray-100 font-bold text-gray-900">
-          <td class="p-3 text-right">GROSS TOTAL:</td>
+        <tr class="bg-gray-100 font-bold text-gray-900 border-t-2 border-gray-400">
+          <td class="p-3 text-right">GROSS TOTAL BILL:</td>
           <td class="p-3 text-right font-mono text-lg" id="ds-gross-total">0</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- New Summary Table for Clarity -->
+    <table class="w-full text-sm border-collapse mb-4 mt-4">
+      <tbody class="border border-gray-200">
+        <tr class="border-b">
+          <td class="p-3 w-1/2">Total Advance / Payments Received</td>
+          <td class="p-3 text-right font-mono text-green-700 font-bold" id="ds-summary-received">0</td>
+        </tr>
+        <tr class="border-b bg-red-50" id="ds-due-row">
+          <td class="p-3">Remaining Balance Due</td>
+          <td class="p-3 text-right font-mono text-red-700 font-bold" id="ds-summary-due">0</td>
+        </tr>
+        <tr class="border-b bg-emerald-50" id="ds-refund-row">
+          <td class="p-3">Refundable Amount</td>
+          <td class="p-3 text-right font-mono text-emerald-700 font-bold" id="ds-summary-refund">0</td>
         </tr>
       </tbody>
     </table>
