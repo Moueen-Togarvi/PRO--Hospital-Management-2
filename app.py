@@ -1835,16 +1835,29 @@ def pay_utility_bill(id):
 def get_employees():
     if not check_db(): return jsonify({"error": "Database error"}), 500
     try:
+        month = request.args.get('month', type=int)
+        year = request.args.get('year', type=int)
+
         # Sort by name alphabetically
         cursor = mongo.db.employees.find().sort('name', 1)
         employees = []
         for e in cursor:
+            advance_value = e.get('advance', '')
+            if month and year:
+                adv_year = e.get('advance_year')
+                adv_month = e.get('advance_month')
+                # Month-aware overhead view: advance automatically resets to 0 in a new month.
+                if adv_year == year and adv_month == month:
+                    advance_value = e.get('advance', '')
+                else:
+                    advance_value = 0
+
             employees.append({
                 'id': str(e['_id']),
                 'name': e.get('name', ''),
                 'designation': e.get('designation', ''),
                 'pay': e.get('pay', ''),
-                'advance': e.get('advance', ''),
+                'advance': advance_value,
                 'duty_timings': e.get('duty_timings', ''),
                 'date_of_joining': e.get('date_of_joining', ''),
                 'cnic': e.get('cnic', ''),
@@ -1861,6 +1874,9 @@ def add_employee():
     if not check_db(): return jsonify({"error": "Database error"}), 500
     data = clean_input_data(request.json)
     try:
+        current = datetime.now()
+        advance_month = int(data.get('month') or current.month)
+        advance_year = int(data.get('year') or current.year)
         employee = {
             'name': data.get('name'),
             'designation': data.get('designation'),
@@ -1870,7 +1886,9 @@ def add_employee():
             'date_of_joining': data.get('date_of_joining', ''),
             'cnic': data.get('cnic', ''),
             'phone': data.get('phone', ''),
-            'created_at': datetime.now()
+            'advance_month': advance_month,
+            'advance_year': advance_year,
+            'created_at': current
         }
         result = mongo.db.employees.insert_one(employee)
         return jsonify({"message": "Employee added", "id": str(result.inserted_id)}), 201
@@ -1882,8 +1900,13 @@ def add_employee():
 def update_employee(id):
     if not check_db(): return jsonify({"error": "Database error"}), 500
     data = clean_input_data(request.json)
+    month = request.args.get('month', type=int)
+    year = request.args.get('year', type=int)
     # Remove _id from data if present to avoid immutable field error
     if '_id' in data: del data['_id']
+    if month and year and 'advance' in data:
+        data['advance_month'] = month
+        data['advance_year'] = year
     try:
         mongo.db.employees.update_one({'_id': ObjectId(id)}, {'$set': data})
         return jsonify({"message": "Employee updated"})
@@ -3004,7 +3027,26 @@ def get_patient_payment_history(id):
 def get_old_balances():
     if not check_db(): return jsonify({"error": "Database error"}), 500
     try:
-        cursor = mongo.db.old_balances.find().sort('created_at', -1)
+        month = request.args.get('month', type=int)
+        year = request.args.get('year', type=int)
+
+        query = {}
+        if month and year:
+            query = {
+                '$or': [
+                    {'month': month, 'year': year},
+                    {
+                        'month': {'$exists': False},
+                        'year': {'$exists': False},
+                        'created_at': {
+                            '$gte': datetime(year, month, 1),
+                            '$lt': datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+                        }
+                    }
+                ]
+            }
+
+        cursor = mongo.db.old_balances.find(query).sort('created_at', -1)
         balances = []
         for b in cursor:
             balances.append({
@@ -3026,12 +3068,16 @@ def add_old_balance():
     if not check_db(): return jsonify({"error": "Database error"}), 500
     data = clean_input_data(request.json)
     try:
+        month = int(data.get('month') or datetime.now().month)
+        year = int(data.get('year') or datetime.now().year)
         record = {
             'name': data.get('name'),
             'amount': int(data.get('amount', 0)),
             'commitment_date': data.get('commitment_date'),
             'last_call_date': data.get('last_call_date'),
             'note': data.get('note', ''),
+            'month': month,
+            'year': year,
             'created_at': datetime.now(),
             'added_by': session.get('username')
         }

@@ -1258,11 +1258,24 @@
       table-layout: auto;
     }
 
+    #patients-view .patients-table-scroll {
+      overflow-x: hidden;
+      overflow-y: hidden;
+    }
+
+    #patients-view table.patients-directory-table {
+      width: 100%;
+      min-width: 0;
+      table-layout: fixed;
+    }
+
     /* All cells: prevent wrapping, let table expand */
     #patients-table-headers th,
     #patients-table-body td {
-      white-space: nowrap !important;
-      word-break: normal !important;
+      white-space: normal !important;
+      overflow: visible;
+      text-overflow: clip;
+      word-break: break-word !important;
     }
 
 
@@ -2698,7 +2711,7 @@
         const emptyMessage = normalizedSearch
           ? 'No patients match your search.'
           : 'No records found.';
-        const colspanCount = isAdmin ? 16 : 11;
+        const colspanCount = document.querySelectorAll('#patients-table-headers th').length || 12;
         tbody.innerHTML = `
             <tr>
               <td colspan="${colspanCount}" class="p-6 text-center text-gray-400">${emptyMessage}</td>
@@ -2788,37 +2801,38 @@
         };
 
         tr.innerHTML = `
-            <td class="px-4 py-6 text-center ${subTextClass} font-bold text-xs border-r border-gray-100">${index + 1}</td>
-            <td class="px-3 py-6 border-r border-gray-100 text-center w-[140px]">
-                <div class="font-extrabold ${textClass} text-sm truncate">${p.name}</div>
-                <div class="text-[10px] ${subTextClass} font-bold tracking-widest mt-0.5">${formattedPid}</div>
+            <td class="px-2 py-3 text-center ${subTextClass} font-bold text-[10px] border-r border-gray-100">${index + 1}</td>
+            <td class="px-2 py-3 border-r border-gray-100 text-center w-[105px]">
+                <div class="font-extrabold ${textClass} text-sm">${p.name}</div>
+                <div class="text-[9px] ${subTextClass} font-bold tracking-widest mt-0.5">${formattedPid}</div>
             </td>
-            <td class="px-3 py-6 whitespace-nowrap text-center ${textClass} font-bold text-sm border-r border-gray-100 w-[130px] truncate">${p.fatherName || '—'}</td>
-            <td class="px-3 py-6 whitespace-nowrap ${subTextClass} font-black text-xs uppercase tracking-tight border-r border-gray-100">${admissionStr ? formatDisplayDate(admissionStr) : '—'}</td>
-            <td class="px-3 py-6 whitespace-nowrap ${textClass} font-bold text-sm max-w-[120px] truncate border-r border-gray-100">${p.area || p.address || '—'}</td>
-            <td class="px-3 py-6 whitespace-nowrap ${valueClass} font-black text-sm border-r border-gray-100">Rs. ${formatNumber(monthlyFeeRaw)}</td>
+            <td class="px-2 py-3 text-center ${textClass} font-bold text-[11px] border-r border-gray-100 w-[100px]">${p.fatherName || '—'}</td>
+            <td class="px-2 py-3 text-center ${textClass} font-bold text-[11px] border-r border-gray-100 w-[95px]">${p.contactNo || p.contact || p.phone || '—'}</td>
+            <td class="px-2 py-3 ${subTextClass} font-black text-[10px] uppercase tracking-tight border-r border-gray-100">${admissionStr ? formatDisplayDate(admissionStr) : '—'}</td>
+            <td class="px-2 py-3 whitespace-nowrap ${textClass} font-bold text-[11px] max-w-[90px] truncate border-r border-gray-100">${p.area || p.address || '—'}</td>
+            <td class="px-2 py-3 ${valueClass} font-black text-[11px] border-r border-gray-100">Rs. ${formatNumber(monthlyFeeRaw)}</td>
             
-            <td class="px-3 py-6 whitespace-nowrap border-r border-gray-100">${stayDisplay}</td>
+            <td class="px-2 py-3 border-r border-gray-100">${stayDisplay}</td>
 
-            <td class="px-3 py-6 whitespace-nowrap ${textClass} font-black text-sm border-r border-gray-100">Rs. ${formatNumber(totalBillValue)}</td>
+            <td class="px-2 py-3 ${textClass} font-black text-[11px] border-r border-gray-100">Rs. ${formatNumber(totalBillValue)}</td>
 
-            <td class="px-3 py-6 whitespace-nowrap ${textClass} font-black text-sm border-r border-gray-100">Rs. ${formatNumber(receivedValue)}</td>
+            <td class="px-2 py-3 ${textClass} font-black text-[11px] border-r border-gray-100">Rs. ${formatNumber(receivedValue)}</td>
 
-            <td class="px-3 py-6 text-center whitespace-nowrap border-r border-gray-100">
+            <td class="px-2 py-3 text-center whitespace-nowrap border-r border-gray-100">
                 <div class="flex items-center justify-center">
                   ${balanceHtml}
                 </div>
             </td>
 
-            <td class="px-2 py-6 whitespace-nowrap overflow-visible w-[120px]">  
-                <div class="flex items-center justify-center gap-2 overflow-visible">
+            <td class="px-2 py-3 whitespace-nowrap overflow-visible w-[120px]">  
+                <div class="flex flex-nowrap items-center justify-center gap-1.5 overflow-visible">
                     ${!isDischarged ? `
-                    <button onclick="event.stopPropagation(); handleDischargeFromTable('${id}')" class="bg-[#e63946] hover:bg-[#d62828] text-white px-4 py-2 rounded-full text-[10px] font-black transition shadow-md shadow-red-500/20 active:scale-95 uppercase tracking-wide flex items-center gap-1.5">
+                    <button onclick="event.stopPropagation(); handleDischargeFromTable('${id}')" class="bg-[#e63946] hover:bg-[#d62828] text-white px-2 py-2 rounded-full text-[9px] font-black transition shadow-md shadow-red-500/20 active:scale-95 uppercase tracking-wide inline-flex items-center gap-1 whitespace-nowrap leading-none">
                         <i class="fas fa-sign-out-alt"></i>
                         Discharge
                     </button>
                     ` : `
-                    <button onclick="event.stopPropagation(); printDischargeSlip('${id}')" class="bg-gray-900 hover:bg-black text-white px-2 py-1.5 rounded-lg text-[9px] font-black transition shadow-md active:scale-95 uppercase tracking-wide flex items-center gap-1 border border-gray-900">
+                    <button onclick="event.stopPropagation(); printDischargeSlip('${id}')" class="bg-gray-900 hover:bg-black text-white px-2 py-1.5 rounded-lg text-[9px] font-black transition shadow-md active:scale-95 uppercase tracking-wide inline-flex items-center gap-1 whitespace-nowrap border border-gray-900">
                         <i class="fas fa-print"></i> Print
                     </button>
                     <details class="relative">
@@ -4656,6 +4670,11 @@
 
       monthSelect.value = String(currentMonth);
       yearSelect.value = String(currentYear);
+      if (!monthSelect.dataset.boundListeners) {
+        monthSelect.addEventListener('change', () => renderOverheads());
+        yearSelect.addEventListener('change', () => renderOverheads());
+        monthSelect.dataset.boundListeners = "true";
+      }
       monthSelect.dataset.initialized = "true";
     }
 
@@ -4850,6 +4869,15 @@
       }
     }
 
+    function getFinanceMonthYear() {
+      const monthEl = document.getElementById('finance-month-select');
+      const yearEl = document.getElementById('finance-year-select');
+      return {
+        month: monthEl ? Number(monthEl.value) : null,
+        year: yearEl ? Number(yearEl.value) : null,
+      };
+    }
+
     // --- TEAM MANAGEMENT ---
     let teamData = [];
 
@@ -4857,7 +4885,12 @@
       if (currentUser.role !== 'Admin') return;
 
       try {
-        const res = await fetch('/api/employees');
+        let url = '/api/employees';
+        if (isOverheadContext) {
+          const { month, year } = getFinanceMonthYear();
+          if (month && year) url += `?month=${month}&year=${year}`;
+        }
+        const res = await fetch(url);
         const employees = await res.json();
         teamData = employees;
 
@@ -4960,6 +4993,7 @@
     async function saveEmployee(e) {
       e.preventDefault();
       const id = document.getElementById('emp-id').value;
+      const { month, year } = getFinanceMonthYear();
       const data = {
         name: document.getElementById('emp-name').value,
         designation: document.getElementById('emp-designation').value,
@@ -4969,6 +5003,8 @@
         date_of_joining: document.getElementById('emp-joining').value,
         cnic: document.getElementById('emp-cnic').value,
         phone: document.getElementById('emp-phone').value,
+        month,
+        year,
       };
 
       let method = 'POST';
@@ -4977,6 +5013,7 @@
       if (id) {
         method = 'PUT';
         url = `/api/employees/${id}`;
+        if (month && year) url += `?month=${month}&year=${year}`;
       }
 
       const res = await fetch(url, {
@@ -4988,7 +5025,7 @@
       if (res.ok) {
         showSuccessModal(id ? 'Employee Updated' : 'Employee Added');
         closeEmployeeModal();
-        renderTeam();
+        renderOverheads();
       } else {
         showSuccessModal('Operation failed', true);
       }
@@ -5000,7 +5037,7 @@
       const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' });
       if (res.ok) {
         showSuccessModal('Employee Removed');
-        renderTeam();
+        renderOverheads();
       } else {
         showSuccessModal('Error removing employee', true);
       }
@@ -6760,7 +6797,10 @@
     // --- OLD BALANCE LOGIC ---
     async function loadOldBalances() {
       try {
-        const res = await fetch('/api/old-balances');
+        const { month, year } = getFinanceMonthYear();
+        let url = '/api/old-balances';
+        if (month && year) url += `?month=${month}&year=${year}`;
+        const res = await fetch(url);
         const records = await res.json();
         const tbody = document.getElementById('old-balance-body');
 
@@ -6803,11 +6843,14 @@
 
     async function addOldBalance(e) {
       e.preventDefault();
+      const { month, year } = getFinanceMonthYear();
       const data = {
         name: document.getElementById('ob-name').value,
         amount: document.getElementById('ob-amount').value,
         commitment_date: document.getElementById('ob-commit-date').value,
         last_call_date: document.getElementById('ob-call-date').value,
+        month,
+        year,
       };
 
       const res = await fetch('/api/old-balances', {
@@ -6819,7 +6862,7 @@
       if (res.ok) {
         showSuccessModal('Recovery Record Added');
         e.target.reset();
-        loadOldBalances();
+        renderOverheads();
       } else {
         showSuccessModal('Error adding record', true);
       }
@@ -6831,7 +6874,7 @@
       const res = await fetch(`/api/old-balances/${id}`, { method: 'DELETE' });
       if (res.ok) {
         showSuccessModal('Record Deleted');
-        loadOldBalances();
+        renderOverheads();
       }
     }
   </script>
@@ -7463,26 +7506,27 @@
           </div>
         </div>
       </div>
-      <div class="bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-visible">
-        <div class="w-full">
-          <table class="w-full table-fixed divide-y divide-gray-100" style="font-size: 0.76rem;">
-            <thead class="bg-[#0b7454] text-white">
+      <div class="bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
+        <div class="w-full patients-table-scroll">
+          <table class="patients-directory-table w-full table-fixed divide-y divide-gray-100" style="font-size: 0.68rem;">
+            <thead id="patients-table-headers" class="bg-[#0b7454] text-white">
               <tr>
                 <th
-                  class="px-4 py-4 text-center uppercase tracking-widest font-black sticky left-0 bg-[#0b7454] z-20 shadow-sm w-12 text-[10px]">
+                  class="px-2 py-2 text-center uppercase tracking-widest font-black shadow-sm w-10 text-[9px]">
                   #</th>
-                <th class="px-3 py-4 text-left uppercase tracking-widest font-black text-[10px] w-[140px]">
+                <th class="px-2 py-2 text-left uppercase tracking-widest font-black text-[9px] w-[105px]">
                   Patient Name</th>
-                <th class="px-3 py-4 text-left uppercase tracking-widest font-black text-[10px] w-[130px]">Guardian</th>
-                <th class="px-3 py-4 text-left uppercase tracking-widest font-black text-[10px]">Admission</th>
-                <th class="px-3 py-4 text-left uppercase tracking-widest font-black text-[10px]">Area</th>
-                <th class="px-3 py-4 text-left uppercase tracking-widest font-black text-[10px]">Fee/Mo</th>
-                <th class="px-3 py-4 text-left uppercase tracking-widest font-black text-[10px]">Stay</th>
-                <th class="px-3 py-4 text-left uppercase tracking-widest font-black text-[10px]">Total Bill</th>
-                <th class="px-3 py-4 text-left uppercase tracking-widest font-black text-[10px]">Paid/Advance</th>
-                <th class="px-3 py-4 text-center uppercase tracking-widest font-black text-[10px]">Balance Status
+                <th class="px-2 py-2 text-left uppercase tracking-widest font-black text-[9px] w-[100px]">Guardian</th>
+                <th class="px-2 py-2 text-left uppercase tracking-widest font-black text-[9px] w-[95px]">Contact</th>
+                <th class="px-2 py-2 text-left uppercase tracking-widest font-black text-[9px]">Admission</th>
+                <th class="px-2 py-2 text-left uppercase tracking-widest font-black text-[9px]">Area</th>
+                <th class="px-2 py-2 text-left uppercase tracking-widest font-black text-[9px]">Fee/Mo</th>
+                <th class="px-2 py-2 text-left uppercase tracking-widest font-black text-[9px]">Stay</th>
+                <th class="px-2 py-2 text-left uppercase tracking-widest font-black text-[9px]">Total Bill</th>
+                <th class="px-2 py-2 text-left uppercase tracking-widest font-black text-[9px]">Paid/Advance</th>
+                <th class="px-2 py-2 text-center uppercase tracking-widest font-black text-[9px]">Balance Status
                 </th>
-                <th class="px-3 py-4 text-center uppercase tracking-widest font-black text-[10px]">Actions</th>
+                <th class="px-2 py-2 text-center uppercase tracking-widest font-black text-[9px]">Actions</th>
               </tr>
             </thead>
             <tbody id="patients-table-body" class="divide-y divide-emerald-50"></tbody>
@@ -7911,6 +7955,7 @@
             </div>
           </div>
         </div>
+
       </div>
 
       <div class="mb-10">
