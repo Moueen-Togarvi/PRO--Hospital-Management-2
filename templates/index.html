@@ -623,6 +623,7 @@
 
       /* Add this: Ensure the receipt takes full screen when active */
       #printable-receipt.print-active,
+      #printable-manual-discharge.print-active,
       #printable-prescription.print-active {
         display: block !important;
         position: absolute;
@@ -637,6 +638,7 @@
       /* Hide everything else when a print target is active */
       body:has(#printable-receipt.print-active)>*:not(#printable-receipt),
       body:has(#printable-discharge-slip.print-active)>*:not(#printable-discharge-slip),
+      body:has(#printable-manual-discharge.print-active)>*:not(#printable-manual-discharge),
       body:has(#printable-prescription.print-active)>*:not(#printable-prescription) {
         display: none;
       }
@@ -647,6 +649,8 @@
       #printable-receipt.print-active *,
       #printable-discharge-slip.print-active,
       #printable-discharge-slip.print-active *,
+      #printable-manual-discharge.print-active,
+      #printable-manual-discharge.print-active *,
       #printable-prescription.print-active,
       #printable-prescription.print-active * {
         visibility: visible !important;
@@ -654,6 +658,7 @@
 
       #printable-receipt.print-active,
       #printable-discharge-slip.print-active,
+      #printable-manual-discharge.print-active,
       #printable-prescription.print-active {
         position: absolute;
         left: 0;
@@ -673,7 +678,8 @@
         }
 
         #printable-receipt.print-active,
-        #printable-discharge-slip.print-active {
+        #printable-discharge-slip.print-active,
+        #printable-manual-discharge.print-active {
           page: receipt-page;
           visibility: visible;
         }
@@ -1729,6 +1735,7 @@
         'nav-users': ['Admin'],
         'nav-accounts': ['Admin'],
         'nav-overheads-finance': ['Admin'],
+        'nav-manual-discharge': ['Admin'],
         'nav-monthly-overheads': ['Admin'],
         'nav-attendance': ['Admin'],
         'nav-reports': ['Admin', 'General Staff', 'Doctor'],
@@ -1860,6 +1867,10 @@
         showSuccessModal('Access Denied.', true);
         return;
       }
+      if (viewId === 'manual-discharge-view' && currentUser.role !== 'Admin') {
+        showSuccessModal('Access Denied.', true);
+        return;
+      }
 
       document.querySelectorAll('.view-section').forEach((el) => el.classList.add('hidden'));
       document.getElementById(viewId).classList.remove('hidden');
@@ -1883,6 +1894,7 @@
         'user-management-view': 'nav-users',
         'accounts-view': 'nav-accounts',
         'overheads-view': 'nav-overheads-finance',
+        'manual-discharge-view': 'nav-manual-discharge',
         'monthly-overheads-view': 'nav-monthly-overheads',
         'attendance-view': 'nav-attendance',
         'daily-report-view': 'nav-reports',
@@ -1920,6 +1932,7 @@
       if (viewId === 'utility-bills-view') renderUtilityBills();
       if (viewId === 'team-view') renderTeam();
       if (viewId === 'overheads-view') renderOverheads();
+      if (viewId === 'manual-discharge-view') renderManualDischargePage();
       if (viewId === 'monthly-overheads-view') renderMonthlyOverheads();
       if (viewId === 'attendance-view') renderAttendanceView();
       if (viewId === 'daily-report-view') {
@@ -6877,6 +6890,406 @@
         renderOverheads();
       }
     }
+
+    // --- MANUAL DISCHARGE RECEIPT LOGIC ---
+    let manualDischargeRows = [];
+    let manualDischargeSearchTerm = '';
+    let manualDischargeDraftByPatient = {};
+
+    function parseAmount(val) {
+      const n = Number(String(val || '0').replace(/,/g, '').trim() || '0');
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function calcManualDischargeTotals() {
+      const stay = parseAmount(document.getElementById('mdr-stay-days')?.value || 0);
+      const monthlyFee = parseAmount(document.getElementById('mdr-monthly-fee')?.value || 0);
+      const canteen = parseAmount(document.getElementById('mdr-canteen')?.value || 0);
+      const laundry = parseAmount(document.getElementById('mdr-laundry')?.value || 0);
+      const other = parseAmount(document.getElementById('mdr-other')?.value || 0);
+      const received = parseAmount(document.getElementById('mdr-received')?.value || 0);
+
+      const feeAmount = Math.round((monthlyFee / 30) * Math.max(1, stay || 0));
+      const gross = feeAmount + canteen + laundry + other;
+      const balance = gross - received;
+
+      const feeEl = document.getElementById('mdr-fee-amount');
+      const grossEl = document.getElementById('mdr-gross');
+      const balanceEl = document.getElementById('mdr-balance');
+      if (feeEl) feeEl.value = feeAmount;
+      if (grossEl) grossEl.value = gross;
+      if (balanceEl) balanceEl.value = balance;
+    }
+
+    function syncManualStayFromDates() {
+      const ad = document.getElementById('mdr-admission-date')?.value;
+      const dis = document.getElementById('mdr-discharge-date')?.value;
+      if (!ad || !dis) return;
+      const a = new Date(`${ad}T00:00:00`);
+      const d = new Date(`${dis}T00:00:00`);
+      const diff = Math.floor((d - a) / (1000 * 60 * 60 * 24));
+      const stay = Math.max(1, diff >= 0 ? diff : 0);
+      const stayEl = document.getElementById('mdr-stay-days');
+      if (stayEl) stayEl.value = stay;
+      calcManualDischargeTotals();
+    }
+
+    function getManualDischargePayload() {
+      return {
+        patient_id: document.getElementById('mdr-patient-id').value || '',
+        patient_name: document.getElementById('mdr-name').value,
+        father_name: document.getElementById('mdr-father').value,
+        cnic: document.getElementById('mdr-cnic').value,
+        contact_no: document.getElementById('mdr-contact').value,
+        area: document.getElementById('mdr-area').value,
+        address: document.getElementById('mdr-address').value,
+        admission_date: document.getElementById('mdr-admission-date').value,
+        discharge_date: document.getElementById('mdr-discharge-date').value,
+        stay_days: parseAmount(document.getElementById('mdr-stay-days').value),
+        monthly_fee: parseAmount(document.getElementById('mdr-monthly-fee').value),
+        fee_amount: parseAmount(document.getElementById('mdr-fee-amount').value),
+        canteen_amount: parseAmount(document.getElementById('mdr-canteen').value),
+        laundry_amount: parseAmount(document.getElementById('mdr-laundry').value),
+        other_amount: parseAmount(document.getElementById('mdr-other').value),
+        received_amount: parseAmount(document.getElementById('mdr-received').value),
+        notes: document.getElementById('mdr-notes').value
+      };
+    }
+
+    function fillManualDischargeModal(data = {}) {
+      const setVal = (id, v = '') => {
+        const el = document.getElementById(id);
+        if (el) el.value = v ?? '';
+      };
+      setVal('mdr-id', data.id || '');
+      setVal('mdr-patient-id', data.patient_id || '');
+      setVal('mdr-name', data.patient_name || data.name || '');
+      setVal('mdr-father', data.father_name || data.fatherName || '');
+      setVal('mdr-cnic', data.cnic || '');
+      setVal('mdr-contact', data.contact_no || data.contactNo || '');
+      setVal('mdr-area', data.area || '');
+      setVal('mdr-address', data.address || '');
+      setVal('mdr-admission-date', data.admission_date || data.admissionDate || '');
+      setVal('mdr-discharge-date', data.discharge_date || new Date().toISOString().split('T')[0]);
+      setVal('mdr-stay-days', data.stay_days || 1);
+      setVal('mdr-monthly-fee', data.monthly_fee || data.monthlyFee || 0);
+      setVal('mdr-fee-amount', data.fee_amount || 0);
+      setVal('mdr-canteen', data.canteen_amount || data.canteenSpent || 0);
+      setVal('mdr-laundry', data.laundry_amount || data.laundryAmount || 0);
+      setVal('mdr-other', data.other_amount || 0);
+      setVal('mdr-received', data.received_amount || data.receivedAmount || 0);
+      setVal('mdr-notes', data.notes || '');
+      calcManualDischargeTotals();
+    }
+
+    function setManualDischargeDraft(patientId, field, value) {
+      const key = String(patientId || '');
+      if (!key) return;
+      if (!manualDischargeDraftByPatient[key]) manualDischargeDraftByPatient[key] = {};
+      manualDischargeDraftByPatient[key][field] = value;
+    }
+
+    function renderManualDischargePatientRows() {
+      const tbody = document.getElementById('manual-discharge-patients-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const term = (manualDischargeSearchTerm || '').trim().toLowerCase();
+      const filtered = (patientsData || []).filter((p) => {
+        if (!term) return true;
+        const hay = `${p.name || ''} ${p.fatherName || ''} ${p.contactNo || ''} ${p.cnic || ''}`.toLowerCase();
+        return hay.includes(term);
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="px-3 py-4 text-center text-gray-400">No patients found.</td></tr>';
+        return;
+      }
+
+      filtered.forEach((p, index) => {
+        const pid = String(p._id || p.id || '');
+        const draft = manualDischargeDraftByPatient[pid] || {};
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-emerald-50/40';
+        tr.innerHTML = `
+          <td class="px-2 py-2 text-gray-500">${index + 1}</td>
+          <td class="px-2 py-2">
+            <div class="font-semibold text-gray-800">${p.name || '-'}</div>
+            <div class="text-[10px] text-gray-500">${p.contactNo || p.contact || p.phone || ''}</div>
+          </td>
+          <td class="px-2 py-2 text-gray-600">${p.admissionDate ? formatDisplayDate(p.admissionDate) : '-'}</td>
+          <td class="px-2 py-2"><input type="number" min="1" value="${draft.stay_days || ''}" placeholder="-" class="w-16 border rounded px-1.5 py-1 text-xs" oninput="setManualDischargeDraft('${pid}','stay_days',this.value)" /></td>
+          <td class="px-2 py-2"><input type="number" value="${draft.monthly_fee || ''}" placeholder="-" class="w-20 border rounded px-1.5 py-1 text-xs" oninput="setManualDischargeDraft('${pid}','monthly_fee',this.value)" /></td>
+          <td class="px-2 py-2"><input type="number" value="${draft.canteen_amount || ''}" placeholder="-" class="w-20 border rounded px-1.5 py-1 text-xs" oninput="setManualDischargeDraft('${pid}','canteen_amount',this.value)" /></td>
+          <td class="px-2 py-2"><input type="number" value="${draft.laundry_amount || ''}" placeholder="-" class="w-20 border rounded px-1.5 py-1 text-xs" oninput="setManualDischargeDraft('${pid}','laundry_amount',this.value)" /></td>
+          <td class="px-2 py-2"><input type="number" value="${draft.other_amount || ''}" placeholder="-" class="w-20 border rounded px-1.5 py-1 text-xs" oninput="setManualDischargeDraft('${pid}','other_amount',this.value)" /></td>
+          <td class="px-2 py-2"><input type="number" value="${draft.received_amount || ''}" placeholder="-" class="w-20 border rounded px-1.5 py-1 text-xs" oninput="setManualDischargeDraft('${pid}','received_amount',this.value)" /></td>
+          <td class="px-2 py-2 text-center">
+            <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded text-[10px] font-bold"
+              onclick="openManualDischargeFromPatientDraft('${pid}')">Fill Form</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openManualDischargeFromPatientDraft(patientId) {
+      const pid = String(patientId || '');
+      const p = (patientsData || []).find((x) => String(x._id || x.id) === pid);
+      if (!p) {
+        showSuccessModal('Patient not found.', true);
+        return;
+      }
+      const draft = manualDischargeDraftByPatient[pid] || {};
+      const admissionDate = p.admissionDate || '';
+      const dischargeDate = new Date().toISOString().split('T')[0];
+
+      fillManualDischargeModal({
+        patient_id: pid,
+        patient_name: p.name || '',
+        father_name: p.fatherName || '',
+        cnic: p.cnic || '',
+        contact_no: p.contactNo || p.contact || p.phone || '',
+        area: p.area || '',
+        address: p.address || '',
+        admission_date: admissionDate,
+        discharge_date: dischargeDate,
+        stay_days: draft.stay_days || 1,
+        monthly_fee: draft.monthly_fee || p.monthlyFee || 0,
+        canteen_amount: draft.canteen_amount || 0,
+        laundry_amount: draft.laundry_amount || 0,
+        other_amount: draft.other_amount || 0,
+        received_amount: draft.received_amount || 0
+      });
+      const modal = document.getElementById('manual-discharge-modal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function loadManualDischargeFromSelectedPatient() {
+      const selectedId = document.getElementById('mdr-patient-select').value;
+      if (!selectedId) return;
+      const p = (patientsData || []).find((x) => String(x._id || x.id) === String(selectedId));
+      if (!p) return;
+
+      const admissionDate = p.admissionDate || new Date().toISOString().split('T')[0];
+      const dischargeDate = new Date().toISOString().split('T')[0];
+      const diff = Math.floor(
+        (new Date(`${dischargeDate}T00:00:00`) - new Date(`${admissionDate}T00:00:00`)) /
+        (1000 * 60 * 60 * 24)
+      );
+      const stayDays = Math.max(1, diff >= 0 ? diff : 0);
+      fillManualDischargeModal({
+        patient_id: p._id || p.id,
+        patient_name: p.name || '',
+        father_name: p.fatherName || '',
+        cnic: p.cnic || '',
+        contact_no: p.contactNo || p.contact || p.phone || '',
+        area: p.area || '',
+        address: p.address || '',
+        admission_date: admissionDate,
+        discharge_date: dischargeDate,
+        stay_days: stayDays,
+        monthly_fee: parseAmount(p.monthlyFee || 0),
+        canteen_amount: parseAmount(p.canteenSpent || 0),
+        laundry_amount: p.laundryStatus ? parseAmount(p.laundryAmount || 0) : 0,
+        received_amount: parseAmount(p.receivedAmount || 0)
+      });
+    }
+
+    function openManualDischargeModal(row = null) {
+      const modal = document.getElementById('manual-discharge-modal');
+      if (!modal) return;
+      if (row) {
+        fillManualDischargeModal(row);
+      } else {
+        fillManualDischargeModal({});
+      }
+      modal.classList.remove('hidden');
+    }
+
+    function closeManualDischargeModal() {
+      const modal = document.getElementById('manual-discharge-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function loadManualDischargeReceipts() {
+      const q = encodeURIComponent((manualDischargeSearchTerm || '').trim());
+      const res = await fetch(`/api/manual-discharge-receipts${q ? `?q=${q}` : ''}`);
+      manualDischargeRows = res.ok ? await res.json() : [];
+      const tbody = document.getElementById('manual-discharge-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (manualDischargeRows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-gray-400">No manual receipts found.</td></tr>';
+        return;
+      }
+
+      manualDischargeRows.forEach((row, idx) => {
+        const gross = parseAmount(row.fee_amount) + parseAmount(row.canteen_amount) + parseAmount(row.laundry_amount) + parseAmount(row.other_amount);
+        const balance = parseAmount(row.net_balance);
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-emerald-50/40';
+        tr.innerHTML = `
+          <td class="px-3 py-3 text-xs text-gray-500">${idx + 1}</td>
+          <td class="px-3 py-3">
+            <div class="font-semibold text-gray-800">${row.patient_name || '-'}</div>
+            <div class="text-xs text-gray-500">${row.contact_no || ''}</div>
+          </td>
+          <td class="px-3 py-3 text-xs text-gray-600">${row.admission_date || '-'}</td>
+          <td class="px-3 py-3 text-xs text-gray-600">${row.discharge_date || '-'}</td>
+          <td class="px-3 py-3 text-right font-mono text-sm">${formatNumber(gross)}</td>
+          <td class="px-3 py-3 text-right font-mono text-sm">${formatNumber(parseAmount(row.received_amount))}</td>
+          <td class="px-3 py-3 text-right font-mono text-sm ${balance > 0 ? 'text-red-600' : balance < 0 ? 'text-emerald-600' : 'text-gray-700'}">${formatNumber(Math.abs(balance))}</td>
+          <td class="px-3 py-3 text-center whitespace-nowrap">
+            <button class="text-blue-600 hover:text-blue-800 px-1" onclick="editManualDischargeReceipt('${row.id}')" title="Edit"><i class="fas fa-edit"></i></button>
+            <button class="text-gray-700 hover:text-black px-1" onclick="printManualDischargeReceipt('${row.id}')" title="Print"><i class="fas fa-print"></i></button>
+            <button class="text-red-600 hover:text-red-800 px-1" onclick="deleteManualDischargeReceipt('${row.id}')" title="Delete"><i class="fas fa-trash"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function renderManualDischargePage() {
+      if (!patientsData || patientsData.length === 0) await fetchPatients();
+      const select = document.getElementById('mdr-patient-select');
+      if (select) {
+        const current = select.value;
+        select.innerHTML = '<option value="">Select patient...</option>';
+        (patientsData || []).forEach((p) => {
+          const id = p._id || p.id;
+          select.innerHTML += `<option value="${id}">${p.name || 'Unknown'}</option>`;
+        });
+        if (current) select.value = current;
+      }
+      renderManualDischargePatientRows();
+      await loadManualDischargeReceipts();
+    }
+
+    function handleManualDischargeSearch(value = '') {
+      manualDischargeSearchTerm = value;
+      renderManualDischargePatientRows();
+      loadManualDischargeReceipts();
+    }
+
+    async function saveManualDischargeReceipt(e) {
+      e.preventDefault();
+      const id = document.getElementById('mdr-id').value;
+      const payload = getManualDischargePayload();
+      const url = id ? `/api/manual-discharge-receipts/${id}` : '/api/manual-discharge-receipts';
+      const method = id ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        showSuccessModal('Failed to save manual discharge receipt.', true);
+        return;
+      }
+
+      closeManualDischargeModal();
+      showSuccessModal(id ? 'Manual discharge receipt updated.' : 'Manual discharge receipt added.');
+      await loadManualDischargeReceipts();
+    }
+
+    async function editManualDischargeReceipt(id) {
+      const res = await fetch(`/api/manual-discharge-receipts/${id}`);
+      if (!res.ok) {
+        showSuccessModal('Record not found.', true);
+        return;
+      }
+      const row = await res.json();
+      openManualDischargeModal(row);
+    }
+
+    async function deleteManualDischargeReceipt(id) {
+      if (!(await showConfirmModal('Delete this manual discharge receipt?'))) return;
+      const res = await fetch(`/api/manual-discharge-receipts/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        showSuccessModal('Failed to delete record.', true);
+        return;
+      }
+      showSuccessModal('Record deleted.');
+      await loadManualDischargeReceipts();
+    }
+
+    async function printManualDischargeReceipt(id) {
+      const row = manualDischargeRows.find((x) => x.id === id) || (await (await fetch(`/api/manual-discharge-receipts/${id}`)).json());
+      if (!row) return;
+
+      const fee = parseAmount(row.fee_amount);
+      const canteen = parseAmount(row.canteen_amount);
+      const laundry = parseAmount(row.laundry_amount);
+      const other = parseAmount(row.other_amount);
+      const received = parseAmount(row.received_amount);
+      const gross = fee + canteen + laundry + other;
+      const balance = parseAmount(row.net_balance);
+
+      const content = document.getElementById('manual-discharge-print-content');
+      if (!content) return;
+      content.innerHTML = `
+        <div class="bg-white p-6 max-w-3xl mx-auto text-gray-800">
+          <div class="flex justify-between items-end border-b-4 border-gray-900 pb-4 mb-6">
+            <div>
+              <h1 class="text-2xl font-extrabold text-gray-900">PRO Hospital</h1>
+              <p class="text-xs text-gray-500">Manual Discharge Receipt</p>
+            </div>
+            <div class="text-right text-xs">
+              <div><span class="font-semibold">Print Date:</span> ${new Date().toLocaleDateString('en-PK')}</div>
+              <div><span class="font-semibold">Discharge Date:</span> ${row.discharge_date || '-'}</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-4">
+            <div><span class="text-gray-500">Patient:</span> <span class="font-semibold">${row.patient_name || '-'}</span></div>
+            <div><span class="text-gray-500">Father/Guardian:</span> <span class="font-semibold">${row.father_name || '-'}</span></div>
+            <div><span class="text-gray-500">CNIC:</span> <span class="font-semibold">${row.cnic || '-'}</span></div>
+            <div><span class="text-gray-500">Contact:</span> <span class="font-semibold">${row.contact_no || '-'}</span></div>
+            <div><span class="text-gray-500">Admission:</span> <span class="font-semibold">${row.admission_date || '-'}</span></div>
+            <div><span class="text-gray-500">Stay:</span> <span class="font-semibold">${row.stay_days || 0} Days</span></div>
+            <div class="col-span-2"><span class="text-gray-500">Address/Area:</span> <span class="font-semibold">${row.area || row.address || '-'}</span></div>
+          </div>
+          <table class="w-full border text-sm mb-4">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="border px-3 py-2 text-left">Description</th>
+                <th class="border px-3 py-2 text-right">Amount (PKR)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="border px-3 py-2">Stay/Fee Amount</td><td class="border px-3 py-2 text-right">${formatNumber(fee)}</td></tr>
+              <tr><td class="border px-3 py-2">Canteen</td><td class="border px-3 py-2 text-right">${formatNumber(canteen)}</td></tr>
+              <tr><td class="border px-3 py-2">Laundry</td><td class="border px-3 py-2 text-right">${formatNumber(laundry)}</td></tr>
+              <tr><td class="border px-3 py-2">Other Charges</td><td class="border px-3 py-2 text-right">${formatNumber(other)}</td></tr>
+              <tr><td class="border px-3 py-2 font-bold">Gross Total</td><td class="border px-3 py-2 text-right font-bold">${formatNumber(gross)}</td></tr>
+              <tr><td class="border px-3 py-2">Received</td><td class="border px-3 py-2 text-right">${formatNumber(received)}</td></tr>
+              <tr><td class="border px-3 py-2 font-bold">${balance >= 0 ? 'Balance Due' : 'Refund'}</td><td class="border px-3 py-2 text-right font-bold">${formatNumber(Math.abs(balance))}</td></tr>
+            </tbody>
+          </table>
+          <div class="text-xs text-gray-500">${row.notes ? `Notes: ${row.notes}` : ''}</div>
+          <div class="mt-16 flex justify-between text-xs">
+            <div class="w-48 border-t pt-1 text-center">Authorized Signature</div>
+            <div class="w-48 border-t pt-1 text-center">Receiver Signature</div>
+          </div>
+        </div>
+      `;
+
+      const printEl = document.getElementById('printable-manual-discharge');
+      if (!printEl) return;
+      document.getElementById('printable-receipt').classList.remove('print-active');
+      document.getElementById('printable-discharge-slip').classList.remove('print-active');
+      printEl.classList.remove('hidden');
+      printEl.classList.add('print-active');
+
+      window.print();
+      setTimeout(() => {
+        printEl.classList.remove('print-active');
+        printEl.classList.add('hidden');
+      }, 600);
+    }
   </script>
 </head>
 
@@ -7043,6 +7456,11 @@
         class="nav-item w-full text-left px-4 py-3 rounded-lg text-emerald-800 hover:bg-emerald-100/80 border border-transparent transition"
         style="display: none">
         <i class="fas fa-coins mr-2"></i>Overheads & Finance
+      </button>
+      <button id="nav-manual-discharge" onclick="window.navigateTo('manual-discharge-view')"
+        class="nav-item w-full text-left px-4 py-3 rounded-lg text-emerald-800 hover:bg-emerald-100/80 border border-transparent transition"
+        style="display: none">
+        <i class="fas fa-file-medical mr-2"></i>Manual Discharge Receipt
       </button>
       <button id="nav-monthly-overheads" onclick="window.navigateTo('monthly-overheads-view')"
         class="nav-item w-full text-left px-4 py-3 rounded-lg text-emerald-800 hover:bg-emerald-100/80 border border-transparent transition"
@@ -7447,6 +7865,72 @@
               </tr>
             </thead>
             <tbody id="accounts-table-body" class="divide-y divide-gray-50 bg-white"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="manual-discharge-view" class="view-section hidden p-4 md:p-8">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="text-2xl font-extrabold text-emerald-900 tracking-tight">
+            <i class="fas fa-file-medical mr-2"></i>Manual Discharge Receipt
+          </h2>
+          <p class="text-sm text-emerald-700/70">Add, edit, and print manually editable discharge receipts.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="search" id="manual-discharge-search" placeholder="Search name/contact/cnic..."
+            class="border border-emerald-200 rounded-lg px-3 py-2 text-sm w-64"
+            oninput="handleManualDischargeSearch(this.value)" />
+          <button onclick="openManualDischargeModal()"
+            class="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">
+            <i class="fas fa-plus mr-1"></i> Add Receipt
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
+        <div class="px-4 py-3 border-b border-emerald-100 bg-emerald-50">
+          <h3 class="text-sm font-bold text-emerald-900 uppercase tracking-wide">Patients List (Manual Blank Fields)</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-100 text-xs">
+            <thead class="bg-[#0b7454] text-white">
+              <tr>
+                <th class="px-2 py-2 text-left uppercase tracking-wide">#</th>
+                <th class="px-2 py-2 text-left uppercase tracking-wide">Patient</th>
+                <th class="px-2 py-2 text-left uppercase tracking-wide">Admission</th>
+                <th class="px-2 py-2 text-left uppercase tracking-wide">Days</th>
+                <th class="px-2 py-2 text-left uppercase tracking-wide">Fee/Mo</th>
+                <th class="px-2 py-2 text-left uppercase tracking-wide">Canteen</th>
+                <th class="px-2 py-2 text-left uppercase tracking-wide">Laundry</th>
+                <th class="px-2 py-2 text-left uppercase tracking-wide">Other</th>
+                <th class="px-2 py-2 text-left uppercase tracking-wide">Received</th>
+                <th class="px-2 py-2 text-center uppercase tracking-wide">Action</th>
+              </tr>
+            </thead>
+            <tbody id="manual-discharge-patients-body" class="divide-y divide-gray-50"></tbody>
+          </table>
+        </div>
+
+        <div class="px-4 py-3 border-y border-emerald-100 bg-gray-50">
+          <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wide">Saved Manual Receipts</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-100 text-sm">
+            <thead class="bg-[#0b7454] text-white">
+              <tr>
+                <th class="px-3 py-3 text-left text-[10px] uppercase tracking-wide">#</th>
+                <th class="px-3 py-3 text-left text-[10px] uppercase tracking-wide">Patient</th>
+                <th class="px-3 py-3 text-left text-[10px] uppercase tracking-wide">Admission</th>
+                <th class="px-3 py-3 text-left text-[10px] uppercase tracking-wide">Discharge</th>
+                <th class="px-3 py-3 text-right text-[10px] uppercase tracking-wide">Gross</th>
+                <th class="px-3 py-3 text-right text-[10px] uppercase tracking-wide">Received</th>
+                <th class="px-3 py-3 text-right text-[10px] uppercase tracking-wide">Balance</th>
+                <th class="px-3 py-3 text-center text-[10px] uppercase tracking-wide">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="manual-discharge-table-body" class="divide-y divide-gray-50"></tbody>
           </table>
         </div>
       </div>
@@ -9300,6 +9784,137 @@
         <p>Pakistan Recovery Oasis - Addiction Treatment & Psychological Services</p>
       </div>
     </div>
+  </div>
+
+  <div id="manual-discharge-modal"
+    class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-5xl mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-bold text-emerald-900">
+          <i class="fas fa-file-medical mr-2"></i>Manual Discharge Receipt
+        </h3>
+        <button onclick="closeManualDischargeModal()" class="text-gray-400 hover:text-gray-600">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+
+      <form onsubmit="saveManualDischargeReceipt(event)">
+        <input type="hidden" id="mdr-id" />
+        <input type="hidden" id="mdr-patient-id" />
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+          <div class="md:col-span-2">
+            <label class="text-xs font-bold text-gray-600 uppercase">Patient (optional)</label>
+            <select id="mdr-patient-select" class="w-full border rounded p-2 text-sm"
+              onchange="document.getElementById('mdr-patient-id').value=this.value">
+              <option value="">Select patient...</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <button type="button" onclick="loadManualDischargeFromSelectedPatient()"
+              class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 border rounded p-2 text-sm font-bold">
+              Load Patient Data
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Patient Name</label>
+            <input id="mdr-name" class="w-full border rounded p-2 text-sm" required />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Father/Guardian</label>
+            <input id="mdr-father" class="w-full border rounded p-2 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">CNIC</label>
+            <input id="mdr-cnic" class="w-full border rounded p-2 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Contact</label>
+            <input id="mdr-contact" class="w-full border rounded p-2 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Admission Date</label>
+            <input id="mdr-admission-date" type="date" class="w-full border rounded p-2 text-sm"
+              onchange="syncManualStayFromDates()" />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Discharge Date</label>
+            <input id="mdr-discharge-date" type="date" class="w-full border rounded p-2 text-sm"
+              onchange="syncManualStayFromDates()" />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Stay Days</label>
+            <input id="mdr-stay-days" type="number" min="1" value="1" class="w-full border rounded p-2 text-sm"
+              oninput="calcManualDischargeTotals()" />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Monthly Fee</label>
+            <input id="mdr-monthly-fee" type="number" value="0" class="w-full border rounded p-2 text-sm"
+              oninput="calcManualDischargeTotals()" />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Fee Amount</label>
+            <input id="mdr-fee-amount" type="number" value="0" class="w-full border rounded p-2 text-sm bg-gray-50"
+              readonly />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Canteen</label>
+            <input id="mdr-canteen" type="number" value="0" class="w-full border rounded p-2 text-sm"
+              oninput="calcManualDischargeTotals()" />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Laundry</label>
+            <input id="mdr-laundry" type="number" value="0" class="w-full border rounded p-2 text-sm"
+              oninput="calcManualDischargeTotals()" />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Other Charges</label>
+            <input id="mdr-other" type="number" value="0" class="w-full border rounded p-2 text-sm"
+              oninput="calcManualDischargeTotals()" />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Received</label>
+            <input id="mdr-received" type="number" value="0" class="w-full border rounded p-2 text-sm"
+              oninput="calcManualDischargeTotals()" />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Gross Total</label>
+            <input id="mdr-gross" type="number" value="0" class="w-full border rounded p-2 text-sm bg-gray-50"
+              readonly />
+          </div>
+          <div>
+            <label class="text-xs font-bold text-gray-600 uppercase">Net Balance</label>
+            <input id="mdr-balance" type="number" value="0" class="w-full border rounded p-2 text-sm bg-gray-50"
+              readonly />
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-xs font-bold text-gray-600 uppercase">Area</label>
+            <input id="mdr-area" class="w-full border rounded p-2 text-sm" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="text-xs font-bold text-gray-600 uppercase">Address</label>
+            <input id="mdr-address" class="w-full border rounded p-2 text-sm" />
+          </div>
+          <div class="md:col-span-4">
+            <label class="text-xs font-bold text-gray-600 uppercase">Notes</label>
+            <textarea id="mdr-notes" class="w-full border rounded p-2 text-sm" rows="2"></textarea>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3 mt-5">
+          <button type="button" onclick="closeManualDischargeModal()"
+            class="px-4 py-2 rounded bg-gray-100 text-gray-700 font-semibold">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded bg-emerald-700 text-white font-bold">Save Receipt</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="printable-manual-discharge" class="hidden">
+    <div id="manual-discharge-print-content"></div>
   </div>
 
   <!-- Payment Records Modal -->

@@ -1936,14 +1936,36 @@ def get_payment_records():
             'category': 'Patient Fee'
         }).sort('date', -1))  # Most recent first
         
+        # Get all unique patient IDs from payments to fetch names in bulk
+        patient_ids = list(set(p.get('patient_id') for p in payments if p.get('patient_id')))
+        patient_map = {}
+        if patient_ids:
+            valid_ids = []
+            for pid in patient_ids:
+                try:
+                    if pid and isinstance(pid, str) and len(pid) == 24:
+                        valid_ids.append(ObjectId(pid))
+                except: pass
+            patients = list(mongo.db.patients.find({'_id': {'$in': valid_ids}}, {'name': 1}))
+            patient_map = {str(pat['_id']): pat.get('name', 'Unknown') for pat in patients}
+
         # Process and format the records
         records = []
         for p in payments:
-            # Extract patient name from note
-            note = p.get('note', '')
-            patient_name = 'Unknown'
-            if 'Partial payment from ' in note:
-                patient_name = note.split('Partial payment from ')[1].split(' via ')[0]
+            # Prefer patient_id lookup, then fallback to note parsing for legacy data
+            pid = p.get('patient_id')
+            patient_name = patient_map.get(str(pid)) if pid else None
+            
+            if not patient_name:
+                note = p.get('note', '')
+                if 'Partial payment from ' in note:
+                    patient_name = note.split('Partial payment from ')[1].split(' via ')[0]
+                elif 'Payment from ' in note:
+                    patient_name = note.split('Payment from ')[1].split(' via ')[0]
+                elif 'Initial Advance from ' in note:
+                    patient_name = note.split('Initial Advance from ')[1].split(' (')[0]
+                else:
+                    patient_name = 'Unknown'
             
             records.append({
                 '_id': str(p['_id']),
@@ -2334,11 +2356,34 @@ def export_payment_records():
             except Exception:
                 return None
 
+        # Get all unique patient IDs from payments to fetch names in bulk
+        patient_ids = list(set(p.get('patient_id') for p in payments if p.get('patient_id')))
+        patient_map = {}
+        if patient_ids:
+            valid_ids = []
+            for pid in patient_ids:
+                try:
+                    if pid and isinstance(pid, str) and len(pid) == 24:
+                        valid_ids.append(ObjectId(pid))
+                except: pass
+            patients = list(mongo.db.patients.find({'_id': {'$in': valid_ids}}, {'name': 1}))
+            patient_map = {str(pat['_id']): pat.get('name', 'Unknown') for pat in patients}
+
         for p in payments:
-            note = p.get('note', '')
-            patient_name = 'Unknown'
-            if 'Partial payment from ' in note:
-                patient_name = note.split('Partial payment from ')[1].split(' via ')[0]
+            # Prefer patient_id lookup, then fallback to note parsing
+            pid = p.get('patient_id')
+            patient_name = patient_map.get(str(pid)) if pid else None
+            
+            if not patient_name:
+                note = p.get('note', '')
+                if 'Partial payment from ' in note:
+                    patient_name = note.split('Partial payment from ')[1].split(' via ')[0]
+                elif 'Payment from ' in note:
+                    patient_name = note.split('Payment from ')[1].split(' via ')[0]
+                elif 'Initial Advance from ' in note:
+                    patient_name = note.split('Initial Advance from ')[1].split(' (')[0]
+                else:
+                    patient_name = 'Unknown'
 
             dt = to_date(p.get('date'))
             rows.append({
@@ -3094,6 +3139,194 @@ def delete_old_balance(id):
         mongo.db.old_balances.delete_one({'_id': ObjectId(id)})
         return jsonify({"message": "Record deleted"})
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- MANUAL DISCHARGE RECEIPT ROUTES ---
+
+def _safe_int_amount(raw_val):
+    try:
+        return int(float(str(raw_val or '0').replace(',', '').strip() or '0'))
+    except Exception:
+        return 0
+
+def _serialize_manual_receipt(doc):
+    return {
+        'id': str(doc.get('_id')),
+        'patient_id': str(doc.get('patient_id')) if doc.get('patient_id') else '',
+        'patient_name': doc.get('patient_name', ''),
+        'father_name': doc.get('father_name', ''),
+        'cnic': doc.get('cnic', ''),
+        'contact_no': doc.get('contact_no', ''),
+        'area': doc.get('area', ''),
+        'address': doc.get('address', ''),
+        'admission_date': doc.get('admission_date', ''),
+        'discharge_date': doc.get('discharge_date', ''),
+        'stay_days': doc.get('stay_days', 0),
+        'monthly_fee': doc.get('monthly_fee', 0),
+        'fee_amount': doc.get('fee_amount', 0),
+        'canteen_amount': doc.get('canteen_amount', 0),
+        'laundry_amount': doc.get('laundry_amount', 0),
+        'other_amount': doc.get('other_amount', 0),
+        'received_amount': doc.get('received_amount', 0),
+        'net_balance': doc.get('net_balance', 0),
+        'notes': doc.get('notes', ''),
+        'created_by': doc.get('created_by', ''),
+        'updated_by': doc.get('updated_by', ''),
+        'created_at': doc.get('created_at').isoformat() if doc.get('created_at') else '',
+        'updated_at': doc.get('updated_at').isoformat() if doc.get('updated_at') else ''
+    }
+
+@app.route('/api/manual-discharge-receipts', methods=['GET'])
+@role_required(['Admin'])
+def list_manual_discharge_receipts():
+    if not check_db(): return jsonify({"error": "Database error"}), 500
+    try:
+        q = (request.args.get('q') or '').strip().lower()
+        cursor = mongo.db.manual_discharge_receipts.find().sort('created_at', -1)
+        rows = []
+        for doc in cursor:
+            row = _serialize_manual_receipt(doc)
+            if q:
+                hay = f"{row.get('patient_name','')} {row.get('father_name','')} {row.get('contact_no','')} {row.get('cnic','')}".lower()
+                if q not in hay:
+                    continue
+            rows.append(row)
+        return jsonify(rows)
+    except Exception as e:
+        print(f"Manual receipt list error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/manual-discharge-receipts/<id>', methods=['GET'])
+@role_required(['Admin'])
+def get_manual_discharge_receipt(id):
+    if not check_db(): return jsonify({"error": "Database error"}), 500
+    try:
+        doc = mongo.db.manual_discharge_receipts.find_one({'_id': ObjectId(id)})
+        if not doc:
+            return jsonify({"error": "Record not found"}), 404
+        return jsonify(_serialize_manual_receipt(doc))
+    except Exception as e:
+        print(f"Manual receipt get error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/manual-discharge-receipts', methods=['POST'])
+@role_required(['Admin'])
+def create_manual_discharge_receipt():
+    if not check_db(): return jsonify({"error": "Database error"}), 500
+    try:
+        data = clean_input_data(request.json or {})
+        now = datetime.now()
+
+        fee_amount = _safe_int_amount(data.get('fee_amount'))
+        canteen_amount = _safe_int_amount(data.get('canteen_amount'))
+        laundry_amount = _safe_int_amount(data.get('laundry_amount'))
+        other_amount = _safe_int_amount(data.get('other_amount'))
+        received_amount = _safe_int_amount(data.get('received_amount'))
+        gross_total = fee_amount + canteen_amount + laundry_amount + other_amount
+        net_balance = gross_total - received_amount
+
+        patient_id = data.get('patient_id') or ''
+        if patient_id and ObjectId.is_valid(patient_id):
+            patient_id = ObjectId(patient_id)
+        else:
+            patient_id = None
+
+        payload = {
+            'patient_id': patient_id,
+            'patient_name': data.get('patient_name', ''),
+            'father_name': data.get('father_name', ''),
+            'cnic': data.get('cnic', ''),
+            'contact_no': data.get('contact_no', ''),
+            'area': data.get('area', ''),
+            'address': data.get('address', ''),
+            'admission_date': data.get('admission_date', ''),
+            'discharge_date': data.get('discharge_date', ''),
+            'stay_days': _safe_int_amount(data.get('stay_days')),
+            'monthly_fee': _safe_int_amount(data.get('monthly_fee')),
+            'fee_amount': fee_amount,
+            'canteen_amount': canteen_amount,
+            'laundry_amount': laundry_amount,
+            'other_amount': other_amount,
+            'received_amount': received_amount,
+            'net_balance': net_balance,
+            'notes': data.get('notes', ''),
+            'created_by': session.get('username', 'Admin'),
+            'updated_by': session.get('username', 'Admin'),
+            'created_at': now,
+            'updated_at': now
+        }
+
+        result = mongo.db.manual_discharge_receipts.insert_one(payload)
+        return jsonify({"message": "Manual discharge receipt saved", "id": str(result.inserted_id)}), 201
+    except Exception as e:
+        print(f"Manual receipt create error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/manual-discharge-receipts/<id>', methods=['PUT'])
+@role_required(['Admin'])
+def update_manual_discharge_receipt(id):
+    if not check_db(): return jsonify({"error": "Database error"}), 500
+    try:
+        data = clean_input_data(request.json or {})
+        fee_amount = _safe_int_amount(data.get('fee_amount'))
+        canteen_amount = _safe_int_amount(data.get('canteen_amount'))
+        laundry_amount = _safe_int_amount(data.get('laundry_amount'))
+        other_amount = _safe_int_amount(data.get('other_amount'))
+        received_amount = _safe_int_amount(data.get('received_amount'))
+        gross_total = fee_amount + canteen_amount + laundry_amount + other_amount
+        net_balance = gross_total - received_amount
+
+        patient_id = data.get('patient_id') or ''
+        if patient_id and ObjectId.is_valid(patient_id):
+            patient_id = ObjectId(patient_id)
+        else:
+            patient_id = None
+
+        payload = {
+            'patient_id': patient_id,
+            'patient_name': data.get('patient_name', ''),
+            'father_name': data.get('father_name', ''),
+            'cnic': data.get('cnic', ''),
+            'contact_no': data.get('contact_no', ''),
+            'area': data.get('area', ''),
+            'address': data.get('address', ''),
+            'admission_date': data.get('admission_date', ''),
+            'discharge_date': data.get('discharge_date', ''),
+            'stay_days': _safe_int_amount(data.get('stay_days')),
+            'monthly_fee': _safe_int_amount(data.get('monthly_fee')),
+            'fee_amount': fee_amount,
+            'canteen_amount': canteen_amount,
+            'laundry_amount': laundry_amount,
+            'other_amount': other_amount,
+            'received_amount': received_amount,
+            'net_balance': net_balance,
+            'notes': data.get('notes', ''),
+            'updated_by': session.get('username', 'Admin'),
+            'updated_at': datetime.now()
+        }
+
+        result = mongo.db.manual_discharge_receipts.update_one(
+            {'_id': ObjectId(id)},
+            {'$set': payload}
+        )
+        if result.matched_count == 0:
+            return jsonify({"error": "Record not found"}), 404
+        return jsonify({"message": "Manual discharge receipt updated"})
+    except Exception as e:
+        print(f"Manual receipt update error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/manual-discharge-receipts/<id>', methods=['DELETE'])
+@role_required(['Admin'])
+def delete_manual_discharge_receipt(id):
+    if not check_db(): return jsonify({"error": "Database error"}), 500
+    try:
+        result = mongo.db.manual_discharge_receipts.delete_one({'_id': ObjectId(id)})
+        if result.deleted_count == 0:
+            return jsonify({"error": "Record not found"}), 404
+        return jsonify({"message": "Record deleted"})
+    except Exception as e:
+        print(f"Manual receipt delete error: {e}")
         return jsonify({"error": str(e)}), 500
 
 # --- HEALTH CHECK ENDPOINT (for cron-job.org) ---
