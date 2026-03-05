@@ -3416,7 +3416,7 @@
 
           let balanceHtml = '';
           if (balanceDue > 0) {
-            balanceHtml = `<div class="font-black text-red-600 text-sm">Rs ${formatNumber(balanceDue)}</div>`;
+            balanceHtml = `<div class="text-[10px] font-black uppercase tracking-widest text-red-600">Due</div><div class="font-black text-red-600 text-sm">Rs ${formatNumber(balanceDue)}</div>`;
           } else if (balanceDue < 0) {
             balanceHtml = `<div class="text-[10px] font-black uppercase tracking-widest text-emerald-600">Refund</div><div class="font-black text-emerald-600 text-sm">Rs ${formatNumber(Math.abs(balanceDue))}</div>`;
           } else {
