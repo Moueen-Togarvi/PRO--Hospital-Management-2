@@ -1924,6 +1924,53 @@ def delete_employee(id):
         return jsonify({"error": str(e)}), 500
 
 
+def _object_id_or_none(raw_id):
+    try:
+        return ObjectId(str(raw_id))
+    except Exception:
+        return None
+
+
+def _extract_payment_patient_name(note=''):
+    note = str(note or '')
+    if 'Partial payment from ' in note:
+        return note.split('Partial payment from ')[1].split(' via ')[0].strip()
+    if 'Payment from ' in note:
+        return note.split('Payment from ')[1].split(' via ')[0].strip()
+    if 'Initial Advance from ' in note:
+        return note.split('Initial Advance from ')[1].split(' (')[0].strip()
+    return 'Unknown'
+
+
+def _build_payment_record_note(existing_note, patient_name, payment_method):
+    patient_name = patient_name or 'Unknown'
+    existing_note = str(existing_note or '')
+    large_amount_suffix = ' (Large Amount)' if '(Large Amount)' in existing_note else ''
+
+    if existing_note.startswith('Initial Advance from '):
+        return f"Initial Advance from {patient_name} (Admission)"
+    if existing_note.startswith('Partial payment from '):
+        return f"Partial payment from {patient_name} via {payment_method}{large_amount_suffix}"
+    return f"Payment from {patient_name} via {payment_method}{large_amount_suffix}"
+
+
+def _adjust_patient_received_amount(patient_id, delta_amount):
+    patient_oid = _object_id_or_none(patient_id)
+    if not patient_oid:
+        return
+
+    patient = mongo.db.patients.find_one({'_id': patient_oid}, {'receivedAmount': 1})
+    if not patient:
+        return
+
+    current_received = _safe_int_amount(patient.get('receivedAmount', 0))
+    new_total = max(current_received + _safe_int_amount(delta_amount), 0)
+    mongo.db.patients.update_one(
+        {'_id': patient_oid},
+        {'$set': {'receivedAmount': str(new_total)}}
+    )
+
+
 @app.route('/api/payment-records', methods=['GET'])
 @role_required(['Admin'])
 def get_payment_records():
@@ -1942,10 +1989,9 @@ def get_payment_records():
         if patient_ids:
             valid_ids = []
             for pid in patient_ids:
-                try:
-                    if pid and isinstance(pid, str) and len(pid) == 24:
-                        valid_ids.append(ObjectId(pid))
-                except: pass
+                oid = _object_id_or_none(pid)
+                if oid:
+                    valid_ids.append(oid)
             patients = list(mongo.db.patients.find({'_id': {'$in': valid_ids}}, {'name': 1}))
             patient_map = {str(pat['_id']): pat.get('name', 'Unknown') for pat in patients}
 
@@ -1957,29 +2003,120 @@ def get_payment_records():
             patient_name = patient_map.get(str(pid)) if pid else None
             
             if not patient_name:
-                note = p.get('note', '')
-                if 'Partial payment from ' in note:
-                    patient_name = note.split('Partial payment from ')[1].split(' via ')[0]
-                elif 'Payment from ' in note:
-                    patient_name = note.split('Payment from ')[1].split(' via ')[0]
-                elif 'Initial Advance from ' in note:
-                    patient_name = note.split('Initial Advance from ')[1].split(' (')[0]
-                else:
-                    patient_name = 'Unknown'
+                patient_name = _extract_payment_patient_name(p.get('note', ''))
             
             records.append({
                 '_id': str(p['_id']),
+                'patient_id': str(pid) if pid else '',
                 'patient_name': patient_name,
                 'amount': p.get('amount', 0),
                 'date': p.get('date').strftime('%Y-%m-%d') if p.get('date') else 'N/A',
                 'payment_method': p.get('payment_method', 'Cash'),
                 'recorded_by': p.get('recorded_by', 'Admin'),
-                'screenshot': p.get('screenshot', '')
+                'screenshot': p.get('screenshot', ''),
+                'note': p.get('note', '')
             })
         
         return jsonify(records)
     except Exception as e:
         print(f"Payment Records Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/payment-records/<id>', methods=['PUT'])
+@role_required(['Admin'])
+def update_payment_record(id):
+    """Update a patient payment record and keep the patient's received total in sync."""
+    if not check_db(): return jsonify({"error": "Database error"}), 500
+
+    payment_oid = _object_id_or_none(id)
+    if not payment_oid:
+        return jsonify({"error": "Invalid payment record id"}), 400
+
+    data = clean_input_data(request.json or {})
+    amount = _safe_int_amount(data.get('amount'))
+    if amount <= 0:
+        return jsonify({"error": "Amount must be greater than zero"}), 400
+
+    raw_date = str(data.get('date', '')).strip()
+    try:
+        payment_date = datetime.fromisoformat(raw_date) if raw_date else None
+    except ValueError:
+        return jsonify({"error": "Invalid payment date"}), 400
+
+    try:
+        payment_doc = mongo.db.expenses.find_one({
+            '_id': payment_oid,
+            'type': 'incoming',
+            'category': 'Patient Fee'
+        })
+        if not payment_doc:
+            return jsonify({"error": "Payment record not found"}), 404
+
+        payment_method = data.get('payment_method') or payment_doc.get('payment_method', 'Cash')
+        is_online_payment = str(payment_method).lower().startswith('online')
+        screenshot = data.get('screenshot', payment_doc.get('screenshot', '')) if is_online_payment else ''
+
+        patient_id = payment_doc.get('patient_id')
+        patient_name = _extract_payment_patient_name(payment_doc.get('note', ''))
+        patient_oid = _object_id_or_none(patient_id)
+        if patient_oid:
+            patient = mongo.db.patients.find_one({'_id': patient_oid}, {'name': 1})
+            if patient and patient.get('name'):
+                patient_name = patient.get('name')
+
+        old_amount = _safe_int_amount(payment_doc.get('amount'))
+        amount_delta = amount - old_amount
+        if amount_delta:
+            _adjust_patient_received_amount(patient_id, amount_delta)
+
+        mongo.db.expenses.update_one(
+            {'_id': payment_oid},
+            {
+                '$set': {
+                    'amount': amount,
+                    'payment_method': payment_method,
+                    'screenshot': screenshot,
+                    'date': payment_date or payment_doc.get('date') or datetime.now(),
+                    'note': _build_payment_record_note(payment_doc.get('note', ''), patient_name, payment_method),
+                    'updated_at': datetime.now()
+                }
+            }
+        )
+        return jsonify({"message": "Payment record updated"})
+    except Exception as e:
+        print(f"Payment Record Update Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/payment-records/<id>', methods=['DELETE'])
+@role_required(['Admin'])
+def delete_payment_record(id):
+    """Delete a patient payment record and reverse its effect from the patient balance."""
+    if not check_db(): return jsonify({"error": "Database error"}), 500
+
+    payment_oid = _object_id_or_none(id)
+    if not payment_oid:
+        return jsonify({"error": "Invalid payment record id"}), 400
+
+    try:
+        payment_doc = mongo.db.expenses.find_one({
+            '_id': payment_oid,
+            'type': 'incoming',
+            'category': 'Patient Fee'
+        })
+        if not payment_doc:
+            return jsonify({"error": "Payment record not found"}), 404
+
+        _adjust_patient_received_amount(
+            payment_doc.get('patient_id'),
+            -_safe_int_amount(payment_doc.get('amount'))
+        )
+
+        mongo.db.expenses.delete_one({'_id': payment_oid})
+        return jsonify({"message": "Payment record deleted"})
+    except Exception as e:
+        print(f"Payment Record Delete Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -2362,28 +2499,20 @@ def export_payment_records():
         if patient_ids:
             valid_ids = []
             for pid in patient_ids:
-                try:
-                    if pid and isinstance(pid, str) and len(pid) == 24:
-                        valid_ids.append(ObjectId(pid))
-                except: pass
+                oid = _object_id_or_none(pid)
+                if oid:
+                    valid_ids.append(oid)
             patients = list(mongo.db.patients.find({'_id': {'$in': valid_ids}}, {'name': 1}))
             patient_map = {str(pat['_id']): pat.get('name', 'Unknown') for pat in patients}
 
         for p in payments:
             # Prefer patient_id lookup, then fallback to note parsing
             pid = p.get('patient_id')
+            note = p.get('note', '')
             patient_name = patient_map.get(str(pid)) if pid else None
             
             if not patient_name:
-                note = p.get('note', '')
-                if 'Partial payment from ' in note:
-                    patient_name = note.split('Partial payment from ')[1].split(' via ')[0]
-                elif 'Payment from ' in note:
-                    patient_name = note.split('Payment from ')[1].split(' via ')[0]
-                elif 'Initial Advance from ' in note:
-                    patient_name = note.split('Initial Advance from ')[1].split(' (')[0]
-                else:
-                    patient_name = 'Unknown'
+                patient_name = _extract_payment_patient_name(note)
 
             dt = to_date(p.get('date'))
             rows.append({
@@ -2430,10 +2559,17 @@ def export_payment_records():
 def add_patient_payment(id):
     if not check_db(): return jsonify({"error": "Database error"}), 500
     try:
-        data = clean_input_data(request.json)
-        amount_paid = int(data.get('amount', 0))
+        data = clean_input_data(request.json or {})
+        amount_paid = _safe_int_amount(data.get('amount'))
+        if amount_paid <= 0:
+            return jsonify({"error": "Amount must be greater than zero"}), 400
         payment_method = data.get('payment_method', 'Cash') # Cash or Online
-        screenshot = data.get('screenshot', '') # Base64 string if Online
+        screenshot = data.get('screenshot', '') if str(payment_method).lower().startswith('online') else ''
+        raw_payment_date = str(data.get('payment_date', '')).strip()
+        try:
+            payment_date = datetime.fromisoformat(raw_payment_date) if raw_payment_date else datetime.now()
+        except ValueError:
+            return jsonify({"error": "Invalid payment date"}), 400
         
         patient = mongo.db.patients.find_one({'_id': ObjectId(id)})
         if not patient:
@@ -2476,7 +2612,7 @@ def add_patient_payment(id):
             'payment_method': payment_method,
             'patient_id': str(id),
             'screenshot': screenshot,
-            'date': datetime.now(),
+            'date': payment_date,
             'recorded_by': session.get('username', 'Admin'),
             'auto': True
         })
