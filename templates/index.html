@@ -7049,7 +7049,6 @@
           </td>
           <td class="px-2 py-2 text-gray-600">${p.admissionDate ? formatDisplayDate(p.admissionDate) : '-'}</td>
           <td class="px-1 py-2"><input type="number" min="1" value="${stay_days}" placeholder="-" class="w-12 border rounded px-1 min-w-[3rem] py-1 text-xs" oninput="setManualDischargeDraft('${pid}','stay_days',this.value)" /></td>
-          <td class="px-1 py-2"><input type="number" min="1" value="${stay_days}" placeholder="-" class="w-12 border rounded px-1 min-w-[3rem] py-1 text-xs" oninput="setManualDischargeDraft('${pid}','stay_days',this.value)" /></td>
           <td class="px-1 py-2"><input type="number" min="0" value="${monthly_fee}" placeholder="-" class="w-16 border rounded px-1 min-w-[4rem] py-1 text-xs" oninput="setManualDischargeDraft('${pid}','monthly_fee',this.value)" /></td>
           <td class="px-1 py-2"><input type="number" min="0" value="${draft.rehab_next_month_amount || ''}" placeholder="-" class="w-16 border rounded px-1 min-w-[4rem] py-1 text-xs" oninput="setManualDischargeDraft('${pid}','rehab_next_month_amount',this.value)" /></td>
           <td class="px-1 py-2"><input type="number" min="0" value="${draft.test_amount || ''}" placeholder="-" class="w-16 border rounded px-1 min-w-[4rem] py-1 text-xs" oninput="setManualDischargeDraft('${pid}','test_amount',this.value)" /></td>
