@@ -1208,6 +1208,39 @@
       }
     }
 
+    /* Payment records modal layout */
+    #payment-records-modal .payment-records-dialog {
+      height: min(88vh, 820px);
+      overflow: hidden;
+    }
+
+    #payment-records-modal .payment-records-body {
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    #payment-records-modal .payment-records-table-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: none;
+      border: 1px solid rgba(16, 185, 129, 0.14);
+      border-radius: 20px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fdfa 100%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    }
+
+    #payment-records-modal .payment-records-footer {
+      position: relative;
+      z-index: 5;
+      box-shadow: 0 -14px 32px rgba(15, 23, 42, 0.08);
+    }
+
+    @media (max-width: 640px) {
+      #payment-records-modal .payment-records-dialog {
+        height: min(92vh, 820px);
+      }
+    }
+
     /* 2. Zebra Striping (Green Emerald-100 at 20% opacity) */
     /* Target all table body rows, applying color to even rows */
     tbody tr:nth-child(even) {
@@ -10434,7 +10467,7 @@
   <div id="payment-records-modal"
     class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden flex items-center justify-center z-50">
     <div
-      class="bg-white rounded-xl shadow-2xl w-full max-w-5xl mx-4 max-h-[90vh] flex flex-col border border-emerald-100">
+      class="payment-records-dialog bg-white rounded-[28px] shadow-2xl w-full max-w-5xl mx-4 flex flex-col border border-emerald-100">
       <div class="flex justify-between items-center p-6 border-b border-emerald-100">
         <h3 class="text-xl font-bold text-green-900">
           <i class="fas fa-file-invoice-dollar mr-2 text-emerald-600"></i>Payment Records
@@ -10459,7 +10492,7 @@
         </div>
       </div>
 
-      <div class="p-6 flex-1 min-h-0">
+      <div class="payment-records-body p-6 flex-1 flex flex-col gap-4">
         <div class="mb-4 flex flex-wrap gap-4 items-center justify-between">
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <input type="text" id="payment-records-search" placeholder="Search by patient name..."
@@ -10472,7 +10505,7 @@
           </div>
         </div>
 
-        <div class="overflow-x-auto table-scroll-shell" style="--table-scroll-max-height: 24rem;">
+        <div class="payment-records-table-scroll overflow-x-auto table-scroll-shell" style="--table-scroll-max-height: none;">
           <table class="min-w-full divide-y divide-emerald-100">
             <thead class="bg-emerald-600 text-white">
               <tr>
@@ -10498,15 +10531,22 @@
         </div>
       </div>
 
-      <div class="p-4 border-t border-emerald-100 bg-emerald-50 rounded-b-xl">
-        <div class="flex justify-between items-center">
-          <div class="text-sm text-gray-600">
-            Total Amount:
-            <span id="payment-records-total" class="font-bold text-emerald-600">PKR 0</span>
+      <div
+        class="payment-records-footer shrink-0 border-t border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-emerald-50 px-6 py-4 rounded-b-[28px]">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="inline-flex items-center gap-3 self-start rounded-2xl border border-emerald-200 bg-white/90 px-4 py-3 shadow-sm shadow-emerald-100/60">
+            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+              <i class="fas fa-wallet"></i>
+            </span>
+            <div class="leading-tight">
+              <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700/70">Total Amount</p>
+              <p id="payment-records-total" class="text-xl font-extrabold text-emerald-700 whitespace-nowrap">PKR 0</p>
+            </div>
           </div>
           <button onclick="closePaymentRecordsModal()"
-            class="bg-emerald-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-emerald-700 transition">
-            Close
+            class="inline-flex items-center justify-center gap-2 self-start sm:self-auto shrink-0 bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold leading-none hover:bg-emerald-700 transition shadow-lg shadow-emerald-600/20">
+            <i class="fas fa-times"></i>
+            <span>Close</span>
           </button>
         </div>
       </div>
