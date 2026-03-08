@@ -3898,7 +3898,13 @@
 
         tableBody.innerHTML = '';
 
-        data.patients.forEach((patient) => {
+        const activePatientsOnly = (data.patients || []).filter((patient) => {
+          const flag = patient?.isDischarged;
+          if (typeof flag === 'boolean') return !flag;
+          return !['true', '1', 'yes'].includes(String(flag || '').trim().toLowerCase());
+        });
+
+        activePatientsOnly.forEach((patient) => {
           const row = document.createElement('tr');
           row.className = patient.isDischarged ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50';
 

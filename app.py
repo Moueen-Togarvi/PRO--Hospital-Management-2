@@ -855,6 +855,11 @@ def get_canteen_breakdown():
     days_in_month = (next_month - start_of_month).days
     
     try:
+        def _is_discharged_flag(raw_val):
+            if isinstance(raw_val, bool):
+                return raw_val
+            return str(raw_val).strip().lower() in ('true', '1', 'yes')
+
         # 1. Fetch all patients with ID, Name, Allowance AND isDischarged
         patients_cursor = mongo.db.patients.find({}, {
             'name': 1, 'monthlyAllowance': 1, 'isDischarged': 1
@@ -868,6 +873,7 @@ def get_canteen_breakdown():
                 'isDischarged': p.get('isDischarged', False)
             } 
             for p in patients_cursor
+            if not _is_discharged_flag(p.get('isDischarged', False))
         }
         
         # 2. Calculate monthly sales per patient
@@ -1013,6 +1019,11 @@ def get_canteen_monthly_table():
     if not check_db(): return jsonify({"error": "Database error"}), 500
     
     try:
+        def _is_discharged_flag(raw_val):
+            if isinstance(raw_val, bool):
+                return raw_val
+            return str(raw_val).strip().lower() in ('true', '1', 'yes')
+
         # Get month and year from query params, default to current month
         month = int(request.args.get('month', datetime.now().month))
         year = int(request.args.get('year', datetime.now().year))
@@ -1026,13 +1037,15 @@ def get_canteen_monthly_table():
         
         days_in_month = (end_of_month - start_of_month).days
         
-        # Get all patients with their allowances
-        patients_list = list(mongo.db.patients.find({}, {
+        # Get active patients only (exclude discharged from canteen tracker)
+        raw_patients = list(mongo.db.patients.find({}, {
             'name': 1,
             'monthlyAllowance': 1,
             'isDischarged': 1,
             'admissionDate': 1
-        }).sort('name', 1))
+        }))
+        patients_list = [p for p in raw_patients if not _is_discharged_flag(p.get('isDischarged', False))]
+        patients_list.sort(key=lambda p: str(p.get('name', '')).lower())
         
         # Get manual old balance overrides for this month/year
         balance_overrides = {}
@@ -2129,10 +2142,55 @@ def delete_payment_record(id):
 def get_finance_summary(month, year):
     """
     Get a complete financial summary for a given month/year.
-    Includes salaries, utility bills, and daily overheads (kitchen, canteen, others).
+    Includes expected incoming fees, salaries, utility bills,
+    and daily overheads (kitchen, canteen, others).
     """
     if not check_db(): return jsonify({"error": "Database error"}), 500
     try:
+        # Month boundaries for month/year-aware active patient filtering
+        month_start = datetime(year, month, 1).date()
+        if month == 12:
+            month_end = datetime(year + 1, 1, 1).date()
+        else:
+            month_end = datetime(year, month + 1, 1).date()
+
+        def _parse_date_only(raw_val):
+            if not raw_val:
+                return None
+            if isinstance(raw_val, datetime):
+                return raw_val.date()
+            try:
+                # Handles ISO datetime/date strings.
+                return datetime.fromisoformat(str(raw_val).replace('Z', '+00:00')).date()
+            except Exception:
+                try:
+                    # Fallback for non-ISO text that still starts with YYYY-MM-DD.
+                    return datetime.strptime(str(raw_val)[:10], '%Y-%m-%d').date()
+                except Exception:
+                    return None
+
+        # 0. Expected incoming from patients active in selected month
+        # Card label: "Fees from Active Patients"
+        patients = list(mongo.db.patients.find({}, {
+            'monthlyFee': 1,
+            'admissionDate': 1,
+            'isDischarged': 1,
+            'dischargeDate': 1
+        }))
+
+        total_expected_incoming = 0
+        for patient in patients:
+            admission_date = _parse_date_only(patient.get('admissionDate'))
+            discharge_date = _parse_date_only(patient.get('dischargeDate')) if patient.get('isDischarged') else None
+
+            # Include patient only if they overlap selected month.
+            if admission_date and admission_date >= month_end:
+                continue
+            if discharge_date and discharge_date < month_start:
+                continue
+
+            total_expected_incoming += _safe_int_amount(patient.get('monthlyFee', 0))
+
         # 1. Salaries Total
         employees = list(mongo.db.employees.find())
         total_salaries = 0
@@ -2154,13 +2212,11 @@ def get_finance_summary(month, year):
             'year': year
         }))
         
-        total_income = 0
         total_kitchen = 0
         total_others = 0
         total_pay_advance = 0
         
         for entry in overheads:
-            total_income += entry.get('income', 0)
             total_kitchen += entry.get('kitchen', 0)
             total_others += entry.get('others', 0)
             total_pay_advance += entry.get('pay_advance', 0)
@@ -2192,8 +2248,8 @@ def get_finance_summary(month, year):
             'totalOthers': total_others,
             'totalPayAdvance': total_pay_advance,
             'totalEstimatedOverheads': total_estimated_overheads,
-            'totalIncome': total_income,
-            'profit': total_income - total_estimated_overheads
+            'totalIncome': total_expected_incoming,
+            'profit': total_expected_incoming - total_estimated_overheads
         })
     except Exception as e:
         print(f"Finance Summary Error: {e}")
