@@ -34,7 +34,7 @@
       }
     }
 
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&family=Manrope:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Noto+Nastaliq+Urdu:wght@400;700&family=Manrope:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
 
     :root {
       --shamrock: #4ade80;
@@ -1599,7 +1599,243 @@
         padding: 8px 6px !important;
       }
     }
+    /* --- NEW LOGIN DESIGN STYLES --- */
+    #login-view {
+      background: linear-gradient(135deg, #0a2a4a 0%, #0d3b6e 30%, #1a5276 60%, #0e6655 100%) !important;
+      overflow-y: auto !important;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .bg-pattern {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .plus-symbol {
+      position: absolute;
+      color: rgba(255, 255, 255, .12);
+      font-size: 1.4rem;
+      font-weight: 300;
+      animation: floatPlus 6s ease-in-out infinite;
+      user-select: none;
+      will-change: transform, opacity;
+    }
+
+    .plus-symbol.teal { color: rgba(26, 188, 156, .25) }
+    .plus-symbol.green { color: rgba(39, 174, 96, .2) }
+    .plus-symbol.white { color: rgba(255, 255, 255, .1) }
+    .plus-symbol.gold { color: rgba(243, 156, 18, .18) }
+
+    @keyframes floatPlus {
+      0%, 100% { transform: translateY(0) rotate(0deg); opacity: .6 }
+      50% { transform: translateY(-12px) rotate(15deg); opacity: 1 }
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, .07);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, .15);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .2);
+      width: min(980px, 100%);
+      border-radius: 28px;
+      padding: clamp(18px, 4vw, 50px) clamp(16px, 3.5vw, 40px);
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(18px, 3vw, 50px);
+      flex-wrap: wrap;
+    }
+
+    .animate-in { animation: slideUp .7s cubic-bezier(.16, 1, .3, 1) both }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(40px) scale(.97) }
+      to { opacity: 1; transform: translateY(0) scale(1) }
+    }
+
+    .logo-section-login {
+      flex: 1 1 320px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .logo-icon-login {
+      width: clamp(84px, 10vw, 110px);
+      height: clamp(84px, 10vw, 110px);
+      background: linear-gradient(135deg, #fff, #fff);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 40px rgba(26, 188, 156, .5), 0 0 0 8px rgba(26, 188, 156, .15);
+      margin-bottom: 18px;
+      animation: pulseGlow 3s ease-in-out infinite;
+    }
+
+    .logo-img-login {
+      width: clamp(58px, 7vw, 80px);
+      height: clamp(58px, 7vw, 80px);
+      object-fit: contain;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 10px 40px rgba(26, 188, 156, .5), 0 0 0 8px rgba(26, 188, 156, .15) }
+      50% { box-shadow: 0 10px 50px rgba(26, 188, 156, .7), 0 0 0 14px rgba(26, 188, 156, .2) }
+    }
+
+    .brand-name-login {
+      font-size: clamp(1.25rem, 3.2vw, 2.4rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 0%, #a8ffec 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      line-height: 1.05;
+      word-break: break-word;
+    }
+    .brand-name-login.sub {
+      font-size: clamp(1rem, 2.2vw, 1.5rem);
+      letter-spacing: 5px;
+      margin-top: 4px;
+    }
+
+    .divider-line-login {
+      flex: 0 0 auto;
+      width: 2px;
+      height: 220px;
+      background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, .4), transparent);
+    }
+
+    .login-card-inner {
+      flex: 1 1 360px;
+      min-width: 0;
+      width: 100%;
+      background: rgba(255, 255, 255, .95);
+      border-radius: 20px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, .35), 0 0 0 1px rgba(255, 255, 255, .3);
+      padding: clamp(18px, 3.5vw, 40px) clamp(16px, 3vw, 36px);
+    }
+
+    .login-title-new {
+      font-size: clamp(1.25rem, 2.4vw, 1.7rem);
+      font-weight: 800;
+      color: #000;
+      text-align: center;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      line-height: 1.25;
+      margin-bottom: clamp(18px, 3vw, 28px);
+    }
+
+    .field-label-new {
+      display: block;
+      font-size: .88rem;
+      font-weight: 600;
+      color: #1a5276;
+      margin-bottom: 8px;
+      letter-spacing: .5px;
+    }
+
+    .form-input-new {
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 9999px;
+      border: 2px solid #e0e0e0;
+      background: #f8fafc;
+      font-family: 'Poppins', sans-serif;
+      font-size: .95rem;
+      color: #2c3e50;
+      outline: none;
+      transition: all .3s ease;
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, .06);
+    }
+
+    .form-input-new:focus {
+      border-color: #0A870E;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(10, 135, 14, .15), inset 0 2px 6px rgba(0, 0, 0, .04);
+    }
+
+    .btn-login-new {
+      width: 100%;
+      padding: 15px;
+      border-radius: 9999px;
+      border: none;
+      background: linear-gradient(135deg, #0A870E, #0A870E);
+      color: #fff;
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all .3s ease;
+      box-shadow: 0 8px 25px rgba(10, 135, 14, .4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-login-new:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 35px rgba(26, 188, 156, .55)
+    }
+
+    .eye-btn-new {
+      position: absolute;
+      right: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #999;
+      padding: 0;
+      transition: color .2s;
+    }
+
+    .eye-btn-new:hover { color: #1a7a5e }
+
+    .contact-item-new {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #0A870E;
+      font-size: .82rem;
+    }
+
+    .contact-icon-new {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      color: #0A870E;
+      background: transparent;
+      border: 1px solid #0A870E;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 900px) {
+      .glass-card { flex-direction: column }
+      .divider-line-login {
+        width: min(520px, 90%);
+        height: 2px;
+        background: linear-gradient(to right, transparent, rgba(255, 255, 255, .4), transparent);
+      }
+    }
   </style>
+
   <script>
     let patientsData = [];
     let patientsSearchTerm = '';
@@ -1892,6 +2128,54 @@
         showSuccessModal('Login error.', true);
       }
     };
+
+    // --- NEW LOGIN DESIGN JS ---
+    window.generatePattern = function() {
+      const container = document.getElementById('bgPattern');
+      if (!container) return;
+      const classes = ['teal', 'green', 'white', 'gold', ''];
+      container.innerHTML = '';
+      
+      const w = window.innerWidth;
+      let count = 90;
+      if (w <= 420) count = 34;
+      else if (w <= 768) count = 55;
+
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        el.className = 'plus-symbol ' + classes[Math.floor(Math.random() * classes.length)];
+        el.textContent = '+';
+        el.style.left = Math.random() * 100 + 'vw';
+        el.style.top = Math.random() * 100 + 'vh';
+        el.style.fontSize = (0.9 + Math.random() * 1.4) + 'rem';
+        el.style.animationDelay = (Math.random() * 6) + 's';
+        el.style.animationDuration = (4 + Math.random() * 5) + 's';
+        el.style.opacity = (0.2 + Math.random() * 0.6);
+        container.appendChild(el);
+      }
+    };
+
+    let pwVisible = false;
+    window.togglePasswordVisibility = function() {
+      pwVisible = !pwVisible;
+      const pw = document.getElementById('login-password');
+      const icon = document.getElementById('eyeIconLogin');
+      if (!pw || !icon) return;
+      
+      pw.type = pwVisible ? 'text' : 'password';
+      icon.innerHTML = pwVisible
+        ? `<path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486l.708.709z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829l.822.822zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/><path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12-.708.708z"/>`
+        : `<path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>`;
+    };
+
+    // Initialize pattern
+    document.addEventListener('DOMContentLoaded', () => {
+      window.generatePattern();
+      window.addEventListener('resize', () => {
+        clearTimeout(window.patternResizer);
+        window.patternResizer = setTimeout(window.generatePattern, 200);
+      });
+    });
 
     window.handleForgotPassword = async function (e) {
       e.preventDefault();
@@ -8026,26 +8310,78 @@
     </div>
   </div>
 
-  <section id="login-view" class="view-section fixed inset-0 z-40 bg-gray-50 flex items-center justify-center hidden">
-    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm mx-4">
-      <h1 class="text-3xl font-bold text-center text-green-900 mb-2">
-        <i class="fas fa-brain"></i> PRO System
-      </h1>
-      <form onsubmit="handleLogin(event)">
-        <input type="text" id="login-username" class="w-full p-3 mb-4 border rounded" placeholder="Username" required />
-        <input type="password" id="login-password" class="w-full p-3 mb-3 border rounded" placeholder="Password"
-          required />
-        <div class="text-right mb-4">
-          <button type="button" onclick="openForgotPasswordModal()" class="text-sm text-emerald-700 hover:underline">
-            Forgot password?
-          </button>
+  <section id="login-view" class="view-section fixed inset-0 z-40 flex items-center justify-center hidden">
+    <!-- Background Pattern -->
+    <div class="bg-pattern" id="bgPattern"></div>
+
+    <div class="page w-full min-h-screen flex flex-col justify-center items-center py-10">
+      <div class="glass-card animate-in relative z-10 mx-4">
+        <!-- LEFT: Logo -->
+        <div class="logo-section-login">
+          <div class="logo-icon-login">
+            <img src="https://pakistanrecoveryoasis.com/Images/logo.png" alt="Logo" class="logo-img-login">
+          </div>
+          <div>
+            <div class="brand-name-login">PAKISTAN</div>
+            <div class="brand-name-login sub">RECOVERY OASIS</div>
+            <div style="width:180px;height:2px;background:linear-gradient(90deg,#1abc9c,#27ae60);border-radius:2px;margin:12px auto 0;"></div>
+          </div>
         </div>
-        <button type="submit" class="w-full bg-green-600 text-white p-3 rounded font-bold hover:bg-green-700">
-          Log In
-        </button>
-      </form>
+
+        <!-- Divider -->
+        <div class="divider-line-login"></div>
+
+        <!-- RIGHT: Login Form -->
+        <div class="login-card-inner">
+          <div class="login-title-new">LOGIN ACCOUNT</div>
+          <form onsubmit="window.handleLogin(event)" autocomplete="off">
+            <div style="margin-bottom:20px;">
+              <label class="field-label-new" for="login-username">Email / Username:</label>
+              <input class="form-input-new" type="text" id="login-username" name="username" placeholder="admin" required autocomplete="off" />
+            </div>
+            <div style="margin-bottom:10px;position:relative;">
+              <label class="field-label-new" for="login-password">Password:</label>
+              <div style="position:relative;">
+                <input class="form-input-new" type="password" id="login-password" name="password" placeholder="••••••••" required autocomplete="new-password" style="padding-right:50px;" />
+                <button type="button" class="eye-btn-new" onclick="window.togglePasswordVisibility()" id="eyeBtnLogin" title="Show/Hide Password">
+                  <svg id="eyeIconLogin" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" />
+                    <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div style="text-align:right;margin-bottom:28px;">
+              <a href="#" class="text-[#1a7a5e] text-[0.82rem] font-medium hover:underline" onclick="event.preventDefault(); window.openForgotPasswordModal()">Forgot Password?</a>
+            </div>
+            <button class="btn-login-new" type="submit">LOGIN</button>
+          </form>
+
+          <!-- Contact Details -->
+          <div style="display:flex;align-items:center;gap:12px;margin:22px 0;">
+            <div style="flex:1;height:1px;background:#e5e7eb;"></div>
+            <span style="font-size:0.75rem;color:#aaa;font-weight:500;">Support</span>
+            <div style="flex:1;height:1px;background:#e5e7eb;"></div>
+          </div>
+          <div class="contact-item-new" style="margin-bottom:10px;">
+            <div class="contact-icon-new"><i class="fas fa-phone-alt"></i></div>
+            <div>
+              <div style="font-size:0.7rem;color:rgba(0,0,0,.5);text-transform:uppercase;letter-spacing:1px;">Phone</div>
+              <div style="color:#0A870E;font-weight:500;">+92 339 9123489</div>
+            </div>
+          </div>
+          <div class="contact-item-new">
+            <div class="contact-icon-new"><i class="fas fa-envelope"></i></div>
+            <div>
+              <div style="font-size:0.7rem;color:rgba(0,0,0,.5);text-transform:uppercase;letter-spacing:1px;">E-Mail</div>
+              <div style="color:#0A870E;font-weight:500;">support@pakistanrecoveryoasis.com</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
+
 
   <!-- FORGOT PASSWORD MODAL -->
   <div id="forgot-password-modal"
