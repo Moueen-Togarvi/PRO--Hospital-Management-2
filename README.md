@@ -1,16 +1,28 @@
-# Hospital CRM (PRO System)
+# PRO - Pakistan Recovery Oasis HMS
 
-## Local Setup
+This is a comprehensive Hospital Management & CRM system designed for mental health and rehabilitation facilities.
 
-1. Install dependencies: `pip install -r requirements.txt`
-2. Run MongoDB locally.
-3. Run the app: `python app.py`
-4. Go to http://127.0.0.1:5000
+## 📄 Documentation
 
-## Environment
+For full technical details, feature guides, and setup instructions, please refer to the main documentation:
 
-- `MONGO_URI`: Mongo connection string
-- `SECRET_KEY`: Flask secret key
-- `GMAIL_USER`: Gmail address used to send reset emails
-- `GMAIL_APP_PASSWORD`: App password for the sender account
-- `PASSWORD_RESET_EXPIRY_MINUTES` (optional): Token expiry window, defaults to 30
+👉 **[DOCUMENTATION.md](DOCUMENTATION.md)**
+
+---
+
+## ⚡ Quick Local Setup
+
+1. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. **Setup Environment**: Create a `.env` file with your `MONGO_URI` and `SECRET_KEY`.
+3. **Run the app**:
+   ```bash
+   python app.py
+   ```
+4. **Access UI**: Go to [http://127.0.0.1:5000](http://127.0.0.1:5000)
+
+## 🛡️ License
+Proprietary - Developed for Pakistan Recovery Oasis.
+
