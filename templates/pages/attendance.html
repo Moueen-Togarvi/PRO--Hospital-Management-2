@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block extra_styles %}
+  <style>
+    .attendance-print-container {
+      display: none;
+    }
+
+    body.print-attendance > *:not(.attendance-print-container) {
+      display: none !important;
+    }
+
+    body.print-attendance .attendance-print-container {
+      display: block !important;
+      position: static !important;
+      inset: auto !important;
+      background: white !important;
+      color: black !important;
+      padding: 16px !important;
+    }
+
+    body.print-attendance .attendance-print-container * {
+      visibility: visible !important;
+    }
+
+    #attendance-view .overflow-x-auto {
+      overflow: visible !important;
+    }
+
+    #attendance-view table {
+      width: 100%;
+    }
+
+    #attendance-view th,
+    #attendance-view td {
+      white-space: nowrap;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<section id="attendance-view" class="view-section -mx-4 -my-5 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
+  <div id="attendance-section">
+    <div class="mb-6">
+      <h2 class="text-2xl font-bold text-green-900">
+        <i class="fas fa-calendar-check mr-2"></i>Staff Attendance
+      </h2>
+      <p class="text-sm text-gray-500">Track and manage monthly staff attendance records.</p>
+    </div>
+
+    <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+      <div class="mb-4 flex flex-wrap items-center gap-3">
+        <h3 class="text-lg font-bold text-gray-800">Monthly Attendance</h3>
+        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+          Month
+          <input id="attendance-month" type="month" class="rounded border px-2 py-1 text-sm" />
+        </label>
+        <button
+          id="attendance-print-btn"
+          class="ml-auto rounded bg-emerald-600 px-3 py-2 text-white shadow-sm hover:bg-emerald-700"
+          type="button"
+        >
+          <i class="fas fa-print mr-2"></i>Print
+        </button>
+      </div>
+
+      <div class="table-scroll-shell overflow-x-auto rounded-lg border bg-white" style="--table-scroll-max-height: 28rem;">
+        <table class="w-full table-fixed border-collapse text-sm">
+          <thead class="bg-emerald-600 text-white">
+            <tr id="attendance-header-row"></tr>
+          </thead>
+          <tbody id="attendance-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{{ url_for('static', filename='js/pages/attendance.js') }}"></script>
+{% endblock %}

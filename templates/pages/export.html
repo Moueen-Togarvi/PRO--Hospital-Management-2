@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="-mx-4 -my-5 bg-[#f6fbf8] px-4 py-8 md:-mx-8 md:-my-8 md:px-8">
+  <div class="mx-auto w-full max-w-sm rounded bg-white p-6 shadow">
+    <h3 class="mb-4 font-bold">Export Data</h3>
+    <button onclick="downloadExcel()" class="w-full rounded bg-green-600 py-2 text-white">
+      Download Excel
+    </button>
+    <a href="{{ return_url }}" class="mt-2 block w-full py-2 text-center text-gray-500">
+      Cancel
+    </a>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/pages/export.js') }}"></script>
+{% endblock %}

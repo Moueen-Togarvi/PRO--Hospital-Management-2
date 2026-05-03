@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section id="staff-dashboard-view" class="view-section -mx-4 -my-5 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
+  <div class="relative mb-8 overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-900 p-8 shadow-2xl shadow-emerald-200/50">
+    <div class="relative z-10 flex flex-col justify-between gap-8 lg:flex-row lg:items-center">
+      <div class="space-y-4">
+        <div class="flex items-center gap-4">
+          <div class="animate-float flex h-14 w-14 items-center justify-center rounded-2xl border border-white/30 bg-white/20 text-white shadow-xl backdrop-blur-xl">
+            <i class="fas fa-user-md text-2xl"></i>
+          </div>
+          <div>
+            <h2 class="text-3xl font-black leading-tight tracking-tight text-white md:text-4xl">Clinical Portal</h2>
+            <p class="text-sm font-medium tracking-wide text-emerald-100/80">Pakistan Recovery Oasis • Staff Dashboard</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span class="rounded-full border border-emerald-400/30 bg-emerald-500/20 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-50 backdrop-blur-md">
+            <i class="fas fa-circle mr-1.5 animate-pulse text-[8px] text-emerald-300"></i> Live Sync Enabled
+          </span>
+          <span id="staff-current-shift-tag" class="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white backdrop-blur-md">
+            <i class="fas fa-clock mr-1.5"></i> Day Shift
+          </span>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-4">
+        <div class="group min-w-[180px] rounded-3xl border border-white/20 bg-white/10 p-5 shadow-2xl backdrop-blur-xl transition-all hover:bg-white/15">
+          <div class="flex items-center gap-4">
+            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/30 text-emerald-200 transition-transform group-hover:scale-110">
+              <i class="fas fa-users text-xl"></i>
+            </div>
+            <div>
+              <div class="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-emerald-100/60">Total Patients</div>
+              <div class="text-3xl font-black text-white" id="staff-dash-total">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="group min-w-[180px] rounded-3xl border border-white/20 bg-white/10 p-5 shadow-2xl backdrop-blur-xl transition-all hover:bg-white/15">
+          <div class="flex items-center gap-4">
+            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/30 text-blue-200 transition-transform group-hover:scale-110">
+              <i class="fas fa-clipboard-check text-xl"></i>
+            </div>
+            <div>
+              <div class="mb-1 text-[10px] font-extrabold uppercase tracking-widest text-emerald-100/60">Completion</div>
+              <div class="text-3xl font-black text-white" id="staff-completion-rate-top">0%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="absolute -right-24 -top-24 h-80 w-80 rounded-full bg-emerald-400/20 blur-[80px]"></div>
+    <div class="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-teal-400/20 blur-[60px]"></div>
+  </div>
+
+  <div class="mb-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+    <div class="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+      <label class="mb-3 block text-[10px] font-black uppercase tracking-widest text-gray-400">Viewing Reports For</label>
+      <div class="group relative">
+        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+          <i class="fas fa-calendar-day text-emerald-600"></i>
+        </div>
+        <input type="date" id="staff-report-date-picker" onchange="renderStaffDashboard()"
+          class="w-full cursor-pointer rounded-2xl border-none bg-emerald-50 py-3 pl-10 pr-4 text-sm font-black text-emerald-900 transition-all focus:ring-2 focus:ring-emerald-500" />
+      </div>
+    </div>
+
+    <div class="group flex items-center gap-5 rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+      <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-inner transition-colors group-hover:bg-blue-600 group-hover:text-white">
+        <i class="fas fa-check-circle text-xl"></i>
+      </div>
+      <div>
+        <div class="mb-1 text-[10px] font-black uppercase tracking-wider text-gray-400">Tasks Completed</div>
+        <div class="text-2xl font-black text-gray-900" id="staff-total-tasks">0</div>
+      </div>
+    </div>
+
+    <div class="group flex items-center gap-5 rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+      <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 shadow-inner transition-colors group-hover:bg-orange-600 group-hover:text-white">
+        <i class="fas fa-exclamation-triangle text-xl"></i>
+      </div>
+      <div>
+        <div class="mb-1 text-[10px] font-black uppercase tracking-wider text-gray-400">Critical Alerts</div>
+        <div class="text-2xl font-black text-gray-900" id="staff-pending-alerts">0</div>
+      </div>
+    </div>
+
+    <div class="group flex items-center gap-5 rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+      <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-600 shadow-inner transition-colors group-hover:bg-purple-600 group-hover:text-white">
+        <i class="fas fa-chart-line text-xl"></i>
+      </div>
+      <div>
+        <div class="mb-1 text-[10px] font-black uppercase tracking-wider text-gray-400">Session Progress</div>
+        <div class="text-2xl font-black text-gray-900" id="staff-completion-rate-card">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-8">
+    <div id="staff-day-report-container" class="animate-fade-in-up" style="animation-delay: 0.1s">
+      <div class="mb-4 flex items-center justify-between px-4">
+        <div class="flex items-center gap-3">
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-yellow-100 text-yellow-600 shadow-sm">
+            <i class="fas fa-sun"></i>
+          </div>
+          <h4 class="text-xl font-black tracking-tight text-emerald-900">Day Report</h4>
+        </div>
+      </div>
+      <div class="overflow-hidden rounded-[2rem] border border-emerald-50 bg-white shadow-xl">
+        <div class="table-scroll-shell w-full overflow-x-auto" style="--table-scroll-max-height: 32rem;">
+          <table class="relative w-full divide-y divide-emerald-100" style="table-layout: fixed">
+            <thead class="bg-emerald-600 text-white">
+              <tr id="staff-day-header-row"></tr>
+            </thead>
+            <tbody id="staff-day-table-body" class="divide-y divide-emerald-50 bg-white text-xs font-medium"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="staff-night-report-container" class="animate-fade-in-up" style="animation-delay: 0.2s">
+      <div class="mb-4 flex items-center justify-between px-4">
+        <div class="flex items-center gap-3">
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 shadow-sm">
+            <i class="fas fa-moon"></i>
+          </div>
+          <h4 class="text-xl font-black tracking-tight text-indigo-900">Night Report</h4>
+        </div>
+      </div>
+      <div class="overflow-hidden rounded-[2rem] border border-indigo-50 bg-white shadow-xl">
+        <div class="table-scroll-shell w-full overflow-x-auto" style="--table-scroll-max-height: 32rem;">
+          <table class="relative w-full divide-y divide-indigo-100" style="table-layout: fixed">
+            <thead class="bg-emerald-600 text-white">
+              <tr id="staff-night-header-row"></tr>
+            </thead>
+            <tbody id="staff-night-table-body" class="divide-y divide-indigo-50 bg-white text-xs font-medium"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="staff-reports-modal" class="fixed inset-0 z-[70] hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+  <div class="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+    <div class="flex items-center justify-between bg-emerald-600 p-6 text-white">
+      <div>
+        <h3 class="text-xl font-black tracking-tight" id="staff-report-title">Patient Reports</h3>
+        <p class="mt-0.5 text-xs font-medium text-emerald-100">Clinical Progress & Medical History</p>
+      </div>
+      <button onclick="document.getElementById('staff-reports-modal').classList.add('hidden')" class="text-white/80 transition hover:text-white">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto bg-gray-50 p-6" id="staff-reports-content"></div>
+    <div class="border-t border-gray-100 bg-white p-4 text-right">
+      <button onclick="document.getElementById('staff-reports-modal').classList.add('hidden')"
+        class="rounded-xl bg-gray-100 px-6 py-2 text-sm font-bold text-gray-600 transition hover:bg-gray-200">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/pages/staff_dashboard.js') }}"></script>
+{% endblock %}

@@ -1,259 +1,376 @@
-const patientsPageState = {
-  patients: [],
-  search: '',
-  user: window.__APP__?.currentUser || { role: 'Guest' },
-};
+let patientsData = [];
+let patientsSearchTerm = '';
+const dischargedPatientIds = new Set();
 
-const formatPatientCurrency = (amount) => `Rs ${new Intl.NumberFormat('en-US').format(Number(amount) || 0)}`;
-const formatPatientNumber = (amount) => new Intl.NumberFormat('en-US').format(Number(amount) || 0);
+function formatNumber(value) {
+  return new Intl.NumberFormat('en-PK').format(Number(String(value ?? 0).replace(/,/g, '')) || 0);
+}
 
 function formatDisplayDate(dateString) {
   if (!dateString) return '—';
+
   let date;
   if (typeof dateString === 'string' && dateString.length === 10) {
     date = new Date(`${dateString}T00:00:00`);
   } else {
     date = new Date(dateString);
   }
+
   if (Number.isNaN(date.getTime())) return '—';
+
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function calculatePatientMetrics(patient) {
-  const monthlyFee = parseInt(String(patient.monthlyFee || '0').replace(/,/g, ''), 10) || 0;
-  const admissionSource = patient.admissionDate || patient.created_at || '';
-  const admissionDate = typeof admissionSource === 'string' && admissionSource.length === 10
-    ? new Date(`${admissionSource}T00:00:00`)
-    : new Date(admissionSource || new Date());
-
-  const daysElapsed = Math.max(0, Math.floor((new Date() - admissionDate) / (1000 * 60 * 60 * 24)));
-  const monthsElapsed = Math.floor(daysElapsed / 30);
-  const calculatedFee = Math.floor((monthlyFee / 30) * Math.max(daysElapsed, 1));
-  const canteenSpent = Number(patient.canteenSpent || 0);
-  const laundry = patient.laundryStatus ? Number(patient.laundryAmount || 0) : 0;
-  const totalBill = calculatedFee + canteenSpent + laundry;
-  const received = parseInt(String(patient.receivedAmount || '0').replace(/,/g, ''), 10) || 0;
-  const balance = totalBill - received;
-
-  return {
-    monthlyFee,
-    admissionSource,
-    daysElapsed,
-    monthsElapsed,
-    totalBill,
-    received,
-    balance,
-  };
+function getRecordIds(record) {
+  return [record?._id, record?.id].filter(Boolean).map((value) => String(value));
 }
 
-function updateStatusLabel(message, tone = 'default') {
-  const el = document.getElementById('patients-table-status');
-  if (!el) return;
-  el.textContent = message;
-  el.className = `text-xs font-black uppercase tracking-[0.18em] ${
-    tone === 'error' ? 'text-red-500' : tone === 'success' ? 'text-emerald-500' : 'text-slate-400'
-  }`;
+function resolvePatientId(id) {
+  const target = String(id || '');
+  if (!target) return '';
+
+  const match = patientsData.find((record) => getRecordIds(record).includes(target));
+  return match ? target : '';
 }
 
-function renderPatientsTable() {
+function showSuccessModal(message, isError = false) {
+  if (typeof window.showToast === 'function') {
+    window.showToast(message, isError);
+    return;
+  }
+
+  window.alert(message);
+}
+
+function showPatientDetail(id) {
+  if (!id) {
+    showSuccessModal('Patient id not found.', true);
+    return;
+  }
+
+  window.location.href = `/patients/${id}`;
+}
+
+function renderPatientsTable(list) {
   const tbody = document.getElementById('patients-table-body');
   if (!tbody) return;
 
-  const normalizedSearch = patientsPageState.search.trim().toLowerCase();
-  const filtered = normalizedSearch
-    ? patientsPageState.patients.filter((patient) => String(patient.name || '').toLowerCase().includes(normalizedSearch))
-    : [...patientsPageState.patients];
+  tbody.innerHTML = '';
+  const normalizedSearch = patientsSearchTerm.trim().toLowerCase();
+  const filteredList = normalizedSearch
+    ? list.filter((patient) => (patient.name || '').toLowerCase().includes(normalizedSearch))
+    : list;
 
-  const active = filtered.filter((patient) => !patient.isDischarged);
-  const discharged = filtered.filter((patient) => patient.isDischarged);
-  const ordered = [...active, ...discharged];
-
-  document.getElementById('patients-total-count').textContent = formatPatientNumber(ordered.length);
-  document.getElementById('patients-active-count').textContent = formatPatientNumber(active.length);
-  document.getElementById('patients-discharged-count').textContent = formatPatientNumber(discharged.length);
-
-  let totalCollection = 0;
-
-  if (ordered.length === 0) {
+  if (filteredList.length === 0) {
+    const emptyMessage = normalizedSearch ? 'No patients match your search.' : 'No records found.';
+    const colspanCount = document.querySelectorAll('#patients-table-headers th').length || 12;
     tbody.innerHTML = `
       <tr>
-        <td colspan="12" class="px-6 py-10 text-center text-sm font-semibold text-slate-400">
-          ${normalizedSearch ? 'No patients match your search.' : 'No patient records found.'}
-        </td>
+        <td colspan="${colspanCount}" class="p-6 text-center text-gray-400">${emptyMessage}</td>
       </tr>
     `;
-    document.getElementById('patients-total-collection').textContent = 'Rs 0';
-    updateStatusLabel(normalizedSearch ? 'Filtered' : 'Empty');
+
+    const totalCollection = document.getElementById('patients-total-collection');
+    if (totalCollection) totalCollection.innerText = 'Rs 0';
     return;
   }
 
-  tbody.innerHTML = ordered.map((patient, index) => {
-    const metrics = calculatePatientMetrics(patient);
-    totalCollection += metrics.received;
+  const activePatients = [];
+  const dischargedPatients = [];
 
-    const patientId = patient._id || patient.id || '';
-    const patientCode = patientId ? `P-${String(patientId).slice(-5).toUpperCase()}` : 'P-XXXXX';
+  filteredList.forEach((patient) => {
+    const patientId = patient._id || patient.id;
+    const isDischarged = dischargedPatientIds.has(String(patientId)) || patient.isDischarged;
+    if (isDischarged) {
+      if (patientId) dischargedPatientIds.add(String(patientId));
+      dischargedPatients.push({ patient: { ...patient, isDischarged: true }, patientId: String(patientId || '') });
+    } else {
+      activePatients.push({ patient, patientId: String(patientId || '') });
+    }
+  });
 
-    let balanceClass = 'cleared';
-    let balanceText = 'Cleared';
-    if (metrics.balance > 0) {
-      balanceClass = 'due';
-      balanceText = `${formatPatientCurrency(metrics.balance)} Due`;
-    } else if (metrics.balance < 0) {
-      balanceClass = 'refund';
-      balanceText = `${formatPatientCurrency(Math.abs(metrics.balance))} Refund`;
+  const orderedPatients = [...activePatients, ...dischargedPatients];
+
+  let totalCollectionValue = 0;
+
+  orderedPatients.forEach(({ patient, patientId }, index) => {
+    const isDischarged = dischargedPatientIds.has(patientId) || patient.isDischarged;
+    const rowContrastClass = isDischarged ? 'bg-gray-50' : '';
+    const textClass = 'text-gray-900';
+    const subTextClass = 'text-gray-500';
+    const valueClass = 'text-gray-900';
+
+    const monthlyFeeRaw = parseInt(String(patient.monthlyFee || '0').replace(/,/g, ''), 10) || 0;
+    const admissionStr = patient.admissionDate || patient.created_at || '';
+    let admissionDt;
+
+    if (admissionStr && typeof admissionStr === 'string' && admissionStr.length === 10) {
+      admissionDt = new Date(`${admissionStr}T00:00:00`);
+    } else {
+      admissionDt = admissionStr ? new Date(admissionStr) : new Date();
     }
 
-    return `
-      <tr class="patient-directory-row ${patient.isDischarged ? 'is-discharged' : ''}">
-        <td class="px-3 py-4 text-center text-[11px] font-black text-slate-400">${index + 1}</td>
-        <td class="px-3 py-4">
-          <div class="font-black text-slate-900">${patient.name || 'Unknown'}</div>
-          <div class="mt-1"><span class="patient-id-badge">${patientCode}</span></div>
-        </td>
-        <td class="px-3 py-4 text-slate-700 font-semibold">${patient.fatherName || patient.guardianName || '—'}</td>
-        <td class="px-3 py-4 text-slate-700 font-semibold">${patient.contactNo || patient.contact || patient.phone || '—'}</td>
-        <td class="px-3 py-4 text-slate-500 font-bold uppercase tracking-[0.08em]">${formatDisplayDate(metrics.admissionSource)}</td>
-        <td class="px-3 py-4 text-slate-700 font-semibold">${patient.area || patient.address || '—'}</td>
-        <td class="px-3 py-4 font-black text-slate-900">${formatPatientCurrency(metrics.monthlyFee)}</td>
-        <td class="px-3 py-4">
-          <div class="font-black text-slate-900">${metrics.daysElapsed} Days</div>
-          <div class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">${metrics.monthsElapsed} Months</div>
-        </td>
-        <td class="px-3 py-4 font-black text-slate-900">${formatPatientCurrency(metrics.totalBill)}</td>
-        <td class="px-3 py-4 font-black text-slate-900">${formatPatientCurrency(metrics.received)}</td>
-        <td class="px-3 py-4 text-center">
-          <span class="patient-balance-pill ${balanceClass}">${balanceText}</span>
-        </td>
-        <td class="px-3 py-4">
-          <div class="patient-action-group">
-            <button type="button" class="patient-action-btn bill" data-action="bill" data-patient-id="${patientId}">
-              <i class="fab fa-whatsapp"></i><span>Bill</span>
-            </button>
-            <a class="patient-action-btn preview" href="/api/patients/${patientId}/bill/preview" target="_blank" rel="noopener">
-              <i class="fas fa-eye"></i><span>Preview</span>
-            </a>
-            <button type="button" class="patient-action-btn ${patient.isDischarged ? 'restore' : 'status'}" data-action="${patient.isDischarged ? 'restore' : 'discharge'}" data-patient-id="${patientId}">
-              <i class="fas ${patient.isDischarged ? 'fa-rotate-left' : 'fa-person-walking-arrow-right'}"></i>
-              <span>${patient.isDischarged ? 'Restore' : 'Discharge'}</span>
-            </button>
-            <a class="patient-action-btn legacy" href="/legacy" title="Open legacy workspace for deep editing">
-              <i class="fas fa-arrow-up-right-from-square"></i><span>Legacy</span>
-            </a>
-          </div>
-        </td>
-      </tr>
+    const today = new Date();
+    const daysDiff = Math.floor((today - admissionDt) / (1000 * 60 * 60 * 24));
+    const daysElapsed = daysDiff >= 0 ? daysDiff : 0;
+    const months = Math.floor(daysElapsed / 30);
+
+    const calculatedFee = Math.floor((monthlyFeeRaw / 30.0) * Math.max(daysElapsed, 1));
+    const canteenSpentValue = Number(patient.canteenSpent || 0);
+    const laundryValue = patient.laundryStatus ? Number(patient.laundryAmount || 0) : 0;
+    const totalBillValue = calculatedFee + canteenSpentValue + laundryValue;
+    const receivedValue = parseInt(String(patient.receivedAmount || '0').replace(/,/g, ''), 10) || 0;
+    const balanceDue = totalBillValue - receivedValue;
+
+    totalCollectionValue += receivedValue;
+
+    const stayDisplay = `<div class="text-sm font-black ${valueClass}">${daysElapsed} Days</div>
+      <div class="text-[9px] font-bold uppercase tracking-tight ${subTextClass}">${months} Months</div>`;
+
+    let balanceHtml = '';
+    if (balanceDue > 0) {
+      balanceHtml = `<div class="${isDischarged ? 'border-gray-100 bg-gray-50 text-gray-400' : 'border-red-100 bg-red-50 text-red-600 shadow-sm'} inline-block rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-wider">Rs. ${formatNumber(balanceDue)} Due</div>`;
+    } else if (balanceDue < 0) {
+      balanceHtml = `<div class="${isDischarged ? 'border-gray-100 bg-gray-50 text-gray-400' : 'border-emerald-100 bg-emerald-50 text-emerald-600 shadow-sm'} inline-block rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-wider">Rs. ${formatNumber(Math.abs(balanceDue))} Refund</div>`;
+    } else {
+      balanceHtml = '<div class="inline-block rounded-full border border-gray-100 bg-gray-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-gray-400">Cleared</div>';
+    }
+
+    const formattedPid = patientId ? `P-${patientId.slice(-5).toUpperCase()}` : 'P-XXXXX';
+
+    const row = document.createElement('tr');
+    row.className = `group cursor-pointer border-b transition hover:bg-gray-50/80 ${isDischarged ? 'discharged-row' : ''} ${rowContrastClass}`;
+    row.onclick = (event) => {
+      if (event.target.closest('button, a, details, summary')) return;
+      showPatientDetail(patientId);
+    };
+
+    row.innerHTML = `
+      <td class="border-r border-gray-100 px-2 py-3 text-center text-[10px] font-bold ${subTextClass}">${index + 1}</td>
+      <td class="w-[105px] border-r border-gray-100 px-2 py-3 text-center">
+        <div class="text-sm font-extrabold ${textClass}">${patient.name || '—'}</div>
+        <div class="mt-0.5 text-[9px] font-bold tracking-tight ${subTextClass}">${formattedPid}</div>
+      </td>
+      <td class="w-[100px] border-r border-gray-100 px-2 py-3 text-center text-[11px] font-bold ${textClass}">${patient.fatherName || '—'}</td>
+      <td class="w-[95px] border-r border-gray-100 px-2 py-3 text-center text-[11px] font-bold ${textClass}">${patient.contactNo || patient.contact || patient.phone || '—'}</td>
+      <td class="border-r border-gray-100 px-2 py-3 text-[10px] font-black uppercase tracking-tight ${subTextClass}">${admissionStr ? formatDisplayDate(admissionStr) : '—'}</td>
+      <td class="max-w-[90px] whitespace-nowrap truncate border-r border-gray-100 px-2 py-3 text-[11px] font-bold ${textClass}">${patient.area || patient.address || '—'}</td>
+      <td class="border-r border-gray-100 px-2 py-3 text-[11px] font-black ${valueClass}">Rs. ${formatNumber(monthlyFeeRaw)}</td>
+      <td class="border-r border-gray-100 px-2 py-3">${stayDisplay}</td>
+      <td class="border-r border-gray-100 px-2 py-3 text-[11px] font-black ${textClass}">Rs. ${formatNumber(totalBillValue)}</td>
+      <td class="border-r border-gray-100 px-2 py-3 text-[11px] font-black ${textClass}">Rs. ${formatNumber(receivedValue)}</td>
+      <td class="whitespace-nowrap border-r border-gray-100 px-2 py-3 text-center">
+        <div class="flex items-center justify-center">
+          ${balanceHtml}
+        </div>
+      </td>
+      <td class="w-[120px] whitespace-nowrap overflow-visible px-2 py-3">
+        <div class="flex flex-nowrap items-center justify-center gap-1.5 overflow-visible">
+          <button onclick="event.stopPropagation(); triggerWhatsAppBill('${patientId}')" title="Send WhatsApp Bill" class="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#25D366] px-2 py-2 text-[9px] font-black uppercase tracking-wide leading-none text-white shadow-md shadow-green-500/20 transition active:scale-95 hover:bg-[#128C7E]">
+            <i class="fab fa-whatsapp text-xs"></i> Bill
+          </button>
+          <button onclick="event.stopPropagation(); window.open('/api/patients/${patientId}/bill/preview', '_blank')" title="Preview Bill" class="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-blue-500 px-2 py-2 text-[9px] font-black uppercase tracking-wide leading-none text-white shadow-md shadow-blue-500/20 transition active:scale-95 hover:bg-blue-600">
+            <i class="fas fa-eye text-xs"></i>
+          </button>
+          ${
+            !isDischarged
+              ? `<button onclick="event.stopPropagation(); handleDischargeFromTable('${patientId}')" class="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#e63946] px-2 py-2 text-[9px] font-black uppercase tracking-wide leading-none text-white shadow-md shadow-red-500/20 transition active:scale-95 hover:bg-[#d62828]">
+                  <i class="fas fa-sign-out-alt"></i>
+                  Discharge
+                </button>`
+              : `<button onclick="event.stopPropagation(); printDischargeSlip('${patientId}')" class="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-gray-900 bg-gray-900 px-2 py-1.5 text-[9px] font-black uppercase tracking-wide text-white shadow-md transition active:scale-95 hover:bg-black">
+                  <i class="fas fa-print"></i> Print
+                </button>
+                <details class="relative">
+                  <summary onclick="event.stopPropagation();" class="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100">
+                    <i class="fas fa-ellipsis-v text-[11px]"></i>
+                  </summary>
+                  <div class="absolute right-0 z-50 mt-1 min-w-[120px] rounded-lg border border-gray-200 bg-white shadow-lg">
+                    <button onclick="event.stopPropagation(); revertDischargeFromTable('${patientId}')" class="w-full rounded-lg px-3 py-2 text-left text-[11px] font-bold text-gray-700 hover:bg-gray-50">
+                      <i class="fas fa-undo mr-1"></i> Restore
+                    </button>
+                  </div>
+                </details>`
+          }
+        </div>
+      </td>
     `;
-  }).join('');
 
-  document.getElementById('patients-total-collection').textContent = formatPatientCurrency(totalCollection);
-  updateStatusLabel(`${ordered.length} rows`, 'success');
+    tbody.appendChild(row);
+  });
 
-  tbody.querySelectorAll('[data-action="bill"]').forEach((button) => {
-    button.addEventListener('click', () => triggerWhatsAppBill(button));
-  });
-  tbody.querySelectorAll('[data-action="discharge"]').forEach((button) => {
-    button.addEventListener('click', () => updateDischargeStatus(button, true));
-  });
-  tbody.querySelectorAll('[data-action="restore"]').forEach((button) => {
-    button.addEventListener('click', () => updateDischargeStatus(button, false));
-  });
+  const totalRecords = document.getElementById('patients-total-count');
+  const activeCount = document.getElementById('patients-active-count');
+  const dischargedCount = document.getElementById('patients-discharged-count');
+  const totalCollection = document.getElementById('patients-total-collection');
+
+  if (totalRecords) totalRecords.innerText = formatNumber(orderedPatients.length);
+  if (activeCount) activeCount.innerText = formatNumber(activePatients.length);
+  if (dischargedCount) dischargedCount.innerText = formatNumber(dischargedPatients.length);
+  if (totalCollection) totalCollection.innerText = `Rs ${formatNumber(totalCollectionValue)}`;
 }
 
-async function triggerWhatsAppBill(button) {
-  const patientId = button.dataset.patientId;
-  const confirmed = await window.confirmAction('Send the WhatsApp bill PDF to this patient guardian?');
-  if (!confirmed) return;
-
-  const original = button.innerHTML;
-  button.disabled = true;
-  button.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Sending</span>';
-
-  const { response, data } = await window.apiFetchJson('/api/whatsapp/trigger-billing', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ patient_id: patientId }),
-  });
-
-  button.disabled = false;
-  button.innerHTML = original;
-
-  if (response.ok) {
-    window.showToast('Bill sent successfully.');
-  } else {
-    window.showToast(data?.error || 'Unable to send billing message.', true);
-  }
-}
-
-async function updateDischargeStatus(button, isDischarged) {
-  const patientId = button.dataset.patientId;
-  const confirmed = await window.confirmAction(
-    isDischarged ? 'Discharge this patient from the directory?' : 'Restore this discharged patient?'
-  );
-  if (!confirmed) return;
-
-  const payload = {
-    isDischarged,
-    dischargeDate: isDischarged ? new Date().toISOString() : '',
-  };
-
-  const { response, data } = await window.apiFetchJson(`/api/patients/${patientId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    window.showToast(data?.error || 'Unable to update discharge status.', true);
+async function triggerWhatsAppBill(id) {
+  if (!id) {
+    showSuccessModal('Patient id not found.', true);
     return;
   }
 
-  window.showToast(isDischarged ? 'Patient discharged.' : 'Patient restored.');
-  await loadPatients();
+  try {
+    const res = await fetch('/api/whatsapp/trigger-billing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patient_id: id }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      showSuccessModal(data.message || 'Billing queued successfully.');
+    } else {
+      showSuccessModal(data.error || 'Unable to send billing message.', true);
+    }
+  } catch (error) {
+    console.error('Billing error:', error);
+    showSuccessModal('Network error while sending bill.', true);
+  }
 }
 
+async function printDischargeSlip(id) {
+  const resolvedId = resolvePatientId(id);
+  if (!resolvedId) {
+    showSuccessModal('Patient id not found.', true);
+    return;
+  }
+
+  window.open(`/api/patients/${resolvedId}/discharge-bill`, '_blank');
+}
+
+window.handleDischargeFromTable = async function (id) {
+  try {
+    const resolvedId = resolvePatientId(id);
+    if (!resolvedId) {
+      showSuccessModal('Patient id not found.', true);
+      return;
+    }
+
+    const payload = {
+      isDischarged: true,
+      dischargeDate: new Date().toISOString(),
+    };
+
+    const res = await fetch(`/api/patients/${resolvedId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      showSuccessModal(errData.error || 'Failed to discharge patient. Please try again.', true);
+      return;
+    }
+
+    dischargedPatientIds.add(String(resolvedId));
+    patientsData = patientsData.map((patient) => {
+      if (getRecordIds(patient).includes(String(resolvedId))) {
+        return { ...patient, isDischarged: true, dischargeDate: payload.dischargeDate };
+      }
+      return patient;
+    });
+
+    renderPatientsTable(patientsData);
+    await printDischargeSlip(resolvedId);
+    showSuccessModal('Patient discharged and saved.');
+  } catch (error) {
+    console.error('Discharge error:', error);
+    showSuccessModal('Network error while discharging.', true);
+  }
+};
+
+window.revertDischargeFromTable = async function (id) {
+  try {
+    const resolvedId = resolvePatientId(id);
+    if (!resolvedId) {
+      showSuccessModal('Patient id not found.', true);
+      return;
+    }
+
+    const payload = {
+      isDischarged: false,
+      dischargeDate: null,
+    };
+
+    const res = await fetch(`/api/patients/${resolvedId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      showSuccessModal(errData.error || 'Failed to restore patient. Please try again.', true);
+      return;
+    }
+
+    dischargedPatientIds.delete(String(resolvedId));
+    patientsData = patientsData.map((patient) => {
+      if (getRecordIds(patient).includes(String(resolvedId))) {
+        return { ...patient, isDischarged: false, dischargeDate: null };
+      }
+      return patient;
+    });
+
+    renderPatientsTable(patientsData);
+    showSuccessModal('Patient restored to active list.');
+  } catch (error) {
+    console.error('Revert discharge error:', error);
+    showSuccessModal('Network error while restoring patient.', true);
+  }
+};
+
+window.handlePatientsSearch = function handlePatientsSearch(value) {
+  patientsSearchTerm = value || '';
+  renderPatientsTable(patientsData);
+};
+
 async function loadPatients() {
-  updateStatusLabel('Loading');
   const tbody = document.getElementById('patients-table-body');
   if (tbody) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="12" class="px-6 py-10 text-center text-sm font-semibold text-slate-400">
-          Loading patient directory...
-        </td>
+        <td colspan="12" class="p-6 text-center text-gray-400">Loading patient directory...</td>
       </tr>
     `;
   }
 
-  const { response, data } = await window.apiFetchJson('/api/patients');
-  if (!response.ok || !Array.isArray(data)) {
-    updateStatusLabel('Error', 'error');
+  try {
+    const res = await fetch('/api/patients');
+    const data = await res.json().catch(() => []);
+
+    if (!res.ok || !Array.isArray(data)) {
+      throw new Error('Unable to load patient records.');
+    }
+
+    patientsData = data;
+    renderPatientsTable(patientsData);
+  } catch (error) {
+    console.error('Patients load error:', error);
     if (tbody) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="12" class="px-6 py-10 text-center text-sm font-semibold text-red-500">
-            Unable to load patient records right now.
-          </td>
+          <td colspan="12" class="p-6 text-center text-red-500">Unable to load patient records right now.</td>
         </tr>
       `;
     }
-    return;
   }
-
-  patientsPageState.patients = data;
-  renderPatientsTable();
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-  document.getElementById('patients-search-input')?.addEventListener('input', (event) => {
-    patientsPageState.search = event.target.value || '';
-    renderPatientsTable();
-  });
-
-  document.getElementById('refresh-patients-btn')?.addEventListener('click', () => {
-    loadPatients();
-  });
-
-  await loadPatients();
+document.addEventListener('DOMContentLoaded', () => {
+  loadPatients();
 });
 
+window.triggerWhatsAppBill = triggerWhatsAppBill;
+window.printDischargeSlip = printDischargeSlip;
+window.showPatientDetail = showPatientDetail;
+window.loadPatients = loadPatients;

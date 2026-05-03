@@ -21,8 +21,25 @@ import jwt
 import redis
 from rq import Queue
 load_dotenv()
+from routes.admission_page import register_admission_page_routes
+from routes.accounts_page import register_account_page_routes
+from routes.attendance_page import register_attendance_page_routes
+from routes.canteen_page import register_canteen_page_routes
+from routes.expenses_page import register_expense_page_routes
+from routes.export_page import register_export_page_routes
+from routes.family_dashboard_page import register_family_dashboard_page_routes
+from routes.monthly_overheads_page import register_monthly_overheads_page_routes
+from routes.overheads_page import register_overheads_page_routes
+from routes.manual_discharge_page import register_manual_discharge_page_routes
 from routes.patients_page import register_patient_page_routes
 from routes.pages import register_page_routes
+from routes.prescription_page import register_prescription_page_routes
+from routes.psych_sessions_page import register_psych_sessions_page_routes
+from routes.reports_page import register_report_page_routes
+from routes.staff_dashboard_page import register_staff_dashboard_page_routes
+from routes.team_page import register_team_page_routes
+from routes.utility_bills_page import register_utility_bills_page_routes
+from routes.users_page import register_user_page_routes
 from services.encryption import encrypt_data, decrypt_data
 
 app = Flask(__name__)
@@ -499,7 +516,24 @@ def check_session():
     return jsonify({"is_logged_in": False})
 
 page_context = register_page_routes(app, mongo, ObjectId)
+register_admission_page_routes(app, page_context)
+register_account_page_routes(app, page_context)
+register_attendance_page_routes(app, page_context)
+register_canteen_page_routes(app, page_context)
+register_expense_page_routes(app, page_context)
+register_export_page_routes(app, page_context)
+register_family_dashboard_page_routes(app, page_context)
+register_monthly_overheads_page_routes(app, page_context)
+register_overheads_page_routes(app, page_context)
+register_manual_discharge_page_routes(app, page_context)
 register_patient_page_routes(app, page_context)
+register_prescription_page_routes(app, page_context)
+register_psych_sessions_page_routes(app, page_context)
+register_report_page_routes(app, page_context)
+register_staff_dashboard_page_routes(app, page_context)
+register_team_page_routes(app, page_context)
+register_utility_bills_page_routes(app, page_context)
+register_user_page_routes(app, page_context)
 
 # --- USER MANAGEMENT (ADMIN ONLY) ---
 @app.route('/api/users', methods=['GET'])
@@ -507,7 +541,12 @@ register_patient_page_routes(app, page_context)
 def get_users():
     if not check_db(): return jsonify([])
     users_cursor = mongo.db.users.find({"deleted_at": {"$exists": False}}, {'password': 0})
-    users = [{**u, '_id': str(u['_id'])} for u in users_cursor]
+    users = []
+    for u in users_cursor:
+        user = {**u, '_id': str(u['_id'])}
+        if 'patient_ids' in user and isinstance(user['patient_ids'], list):
+            user['patient_ids'] = [str(pid) for pid in user['patient_ids']]
+        users.append(user)
     return jsonify(users)
 
 @app.route('/api/users', methods=['POST'])
@@ -845,6 +884,29 @@ def get_month_admissions():
 
 # --- PATIENT API UPDATES ---
 
+def serialize_patient_document(patient_doc):
+    if not patient_doc:
+        return None
+
+    patient = dict(patient_doc)
+    patient_id = str(patient.get('_id'))
+    patient['_id'] = patient_id
+
+    patient['name'] = decrypt_data(patient.get('name', ''))
+    patient['contactNo'] = decrypt_data(patient.get('contactNo', ''))
+    patient['cnic'] = decrypt_data(patient.get('cnic', ''))
+    patient['guardianPhone'] = decrypt_data(patient.get('guardianPhone', ''))
+    patient['guardianName'] = decrypt_data(patient.get('guardianName', ''))
+    patient['monthlyFee'] = patient.get('monthlyFee', '0')
+    patient['photo1'] = patient.get('photo1', '')
+    patient['photo2'] = patient.get('photo2', '')
+    patient['photo3'] = patient.get('photo3', '')
+    patient['isDischarged'] = patient.get('isDischarged', False)
+    patient['dischargeDate'] = patient.get('dischargeDate')
+
+    return patient
+
+
 @app.route('/api/patients', methods=['GET'])
 @login_required
 def get_patients():
@@ -867,35 +929,45 @@ def get_patients():
         
         patients = []
         for p in patients_cursor:
-            patient_id = str(p['_id'])
-            p['_id'] = patient_id
-            
-            # Decrypt sensitive fields
-            raw_name = p.get('name', '')
-            p['name'] = decrypt_data(raw_name)
-            print(f"[Patient Debug] Raw: {raw_name[:10]}... -> Decrypted: {p['name']}")
-            
-            p['contactNo'] = decrypt_data(p.get('contactNo', ''))
-            p['cnic'] = decrypt_data(p.get('cnic', ''))
-            p['guardianPhone'] = decrypt_data(p.get('guardianPhone', ''))
-            p['guardianName'] = decrypt_data(p.get('guardianName', ''))
-            
-            # Ensure monthlyFee is present for canteen view logic
-            p['monthlyFee'] = p.get('monthlyFee', '0')
-            p['photo1'] = p.get('photo1', '')
-            p['photo2'] = p.get('photo2', '')
-            p['photo3'] = p.get('photo3', '')
-            p['isDischarged'] = p.get('isDischarged', False)
-            p['dischargeDate'] = p.get('dischargeDate')
-            
-            # Include canteen spending as separate field
-            p['canteenSpent'] = canteen_totals_map.get(patient_id, 0)
-            
-            patients.append(p)
+            serialized = serialize_patient_document(p)
+            if not serialized:
+                continue
+
+            serialized['canteenSpent'] = canteen_totals_map.get(serialized['_id'], 0)
+            patients.append(serialized)
         return jsonify(patients)
     except Exception as e:
         print(f"DB Fetch Error: {e}")
         return jsonify([])
+
+@app.route('/api/patients/<id>', methods=['GET'])
+@login_required
+def get_patient(id):
+    if not check_db(): return jsonify({"error": "Database error"}), 500
+    try:
+        patient_doc = mongo.db.patients.find_one({'_id': ObjectId(id), 'deleted_at': {'$exists': False}})
+        if not patient_doc:
+            return jsonify({"error": "Patient not found"}), 404
+
+        serialized = serialize_patient_document(patient_doc)
+        if not serialized:
+            return jsonify({"error": "Patient not found"}), 404
+
+        canteen_total = list(mongo.db.canteen_sales.aggregate([
+            {'$match': {
+                'deleted_at': {'$exists': False},
+                'patient_id': ObjectId(id),
+                '$or': [
+                    {'entry_type': {'$exists': False}},
+                    {'entry_type': {'$ne': 'other'}}
+                ]
+            }},
+            {'$group': {'_id': None, 'total': {'$sum': '$amount'}}}
+        ]))
+        serialized['canteenSpent'] = canteen_total[0]['total'] if canteen_total else 0
+        return jsonify(serialized)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/patients', methods=['POST'])
 @role_required(['Admin', 'Doctor']) # Only Admin/Doctor can admit
@@ -916,7 +988,7 @@ def add_patient():
         if 'guardianName' in data: data['guardianName'] = encrypt_data(data['guardianName'])
         
         data['created_at'] = datetime.now()
-        data['notes'] = [] # General Notes (Legacy)
+        data['notes'] = []
         data['monthlyFee'] = data.get('monthlyFee', '0')
         data['monthlyAllowance'] = data.get('monthlyAllowance', '3000') # Default allowance
         data['receivedAmount'] = data.get('receivedAmount', '0')  # New field
@@ -995,7 +1067,9 @@ def update_patient(id):
         data = clean_input_data(request.json)
         if '_id' in data: del data['_id']
         
-        # Allow all users to update all fields. (Restrictions removed as per user request)
+        for field in ['name', 'contactNo', 'cnic', 'guardianPhone', 'guardianName']:
+            if field in data:
+                data[field] = encrypt_data(data[field]) if data[field] else ''
         
         mongo.db.patients.update_one({'_id': ObjectId(id)}, {'$set': data})
         return jsonify({"message": "Updated"})
@@ -1595,7 +1669,7 @@ def list_expenses():
     if not check_db():
         return jsonify({"error": "Database error"}), 500
     try:
-        cursor = mongo.db.expenses.find().sort('date', -1)
+        cursor = mongo.db.expenses.find({'deleted_at': {'$exists': False}}).sort('date', -1)
         expenses = []
         for e in cursor:
             expenses.append({
@@ -1717,7 +1791,7 @@ def expenses_summary():
     start_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     try:
         pipeline = [
-            {'$match': {'date': {'$gte': start_of_month}}},
+            {'$match': {'date': {'$gte': start_of_month}, 'deleted_at': {'$exists': False}}},
             {'$group': {'_id': '$type', 'total': {'$sum': '$amount'}}}
         ]
         summary_data = list(mongo.db.expenses.aggregate(pipeline))

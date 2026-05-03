@@ -9,6 +9,9 @@ const dashboardState = {
   },
 };
 
+let currentCallMeetingRecords = [];
+let callMeetingMeta = {};
+
 const DAY_COLUMN_ORDER = [
   'slot_0800',
   'slot_0900',
@@ -170,6 +173,28 @@ async function fetchPatients() {
   return dashboardState.patientsData;
 }
 
+window.navigateTo = function navigateTo(viewId) {
+  const routeMap = {
+    'dashboard-view': '/dashboard',
+    'patients-view': '/patients',
+    'expenses-view': '/expenses',
+    'canteen-view': '/canteen',
+    'user-management-view': '/users',
+    'accounts-view': '/accounts',
+    'utility-bills-view': '/utility-bills',
+    'team-view': '/team',
+    'overheads-view': '/overheads',
+    'manual-discharge-view': '/manual-discharge',
+    'monthly-overheads-view': '/monthly-overheads',
+    'attendance-view': '/attendance',
+    'prescription-view': '/prescription',
+    'psych-sessions-view': '/psych-sessions',
+    'family-dashboard-view': '/family-dashboard',
+    'staff-dashboard-view': '/staff-dashboard',
+  };
+  window.location.href = routeMap[viewId] || '/dashboard';
+};
+
 function setDefaultReportDate() {
   const dateInput = document.getElementById('report-date-picker');
   if (!dateInput || dateInput.value) return;
@@ -178,30 +203,43 @@ function setDefaultReportDate() {
 }
 
 async function updateDashboard() {
-  const { response, data } = await window.apiFetchJson('/api/dashboard');
-  if (!response.ok || !data) {
-    window.showToast(data?.error || 'Unable to load dashboard metrics.', true);
-    return;
+  try {
+    const isAdmin = dashboardState.currentUser.role === 'Admin';
+    const incomeCard = document.getElementById('dash-income-card');
+    const canteenCard = document.getElementById('dash-canteen-card');
+    const callMeetingSection = document.getElementById('dash-call-meeting-section');
+
+    if (incomeCard) incomeCard.style.display = isAdmin ? '' : 'none';
+    if (canteenCard) canteenCard.style.display = isAdmin ? '' : 'none';
+    if (callMeetingSection) callMeetingSection.style.display = isAdmin ? '' : 'none';
+
+    const { response, data } = await window.apiFetchJson('/api/dashboard');
+    if (!response.ok || !data) return;
+
+    const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long' });
+    const totalEl = document.getElementById('dash-total');
+    const admittedEl = document.getElementById('dash-admitted');
+    const dischargedEl = document.getElementById('dash-discharged');
+    const psychEl = document.getElementById('dash-psy-sessions');
+    const monthEl = document.getElementById('dash-month-label');
+
+    if (totalEl) totalEl.innerText = formatNumber(data.totalPatients);
+    if (admittedEl) admittedEl.innerText = formatNumber(data.admissionsThisMonth || 0);
+    if (dischargedEl) dischargedEl.innerText = formatNumber(data.dischargesThisMonth || 0);
+    if (psychEl) psychEl.innerText = formatNumber(data.totalPsychSessionsToday || 0);
+    if (monthEl) monthEl.innerText = monthLabel;
+  } catch (error) {
+    console.error('Dashboard Error', error);
   }
 
-  const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long' });
-  document.getElementById('dash-total').textContent = formatNumber(data.totalPatients);
-  document.getElementById('dash-admitted').textContent = formatNumber(data.admissionsThisMonth);
-  document.getElementById('dash-discharged').textContent = formatNumber(data.dischargesThisMonth);
-  document.getElementById('dash-psy-sessions').textContent = formatNumber(data.totalPsychSessionsToday);
-  document.getElementById('dash-month-label').textContent = monthLabel;
-  document.getElementById('dash-income').textContent = formatCurrency(data.totalExpectedBalance);
-  document.getElementById('dash-canteen').textContent = formatCurrency(data.totalCanteenSalesThisMonth);
-  document.getElementById('dash-expenses').textContent = formatCurrency(data.totalExpensesThisMonth);
+  const dateInput = document.getElementById('report-date-picker');
+  if (dateInput && !dateInput.value) {
+    const today = new Date();
+    const localIso = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    dateInput.value = localIso;
+  }
 
-  const incomeCard = document.getElementById('dash-income-card');
-  const canteenCard = document.getElementById('dash-canteen-card');
-  const expenseCard = document.getElementById('dash-expenses-card');
-  const shouldShowFinance = canViewFinanceCards();
-
-  [incomeCard, canteenCard, expenseCard].forEach((element) => {
-    if (element) element.style.display = shouldShowFinance ? '' : 'none';
-  });
+  await loadDailyReport();
 }
 
 async function openAdmissionsModal() {
@@ -211,6 +249,7 @@ async function openAdmissionsModal() {
 
   container.innerHTML = '<div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-500">Loading admissions...</div>';
   modal.classList.remove('hidden');
+  modal.classList.add('flex');
 
   const { response, data } = await window.apiFetchJson('/api/dashboard/admissions');
   if (!response.ok || !Array.isArray(data)) {
@@ -240,6 +279,13 @@ async function openAdmissionsModal() {
       </div>
     `;
   }).join('');
+}
+
+function closeAdmissionsModal() {
+  const modal = document.getElementById('admissions-modal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
 }
 
 async function loadEmergencyAlerts() {
@@ -307,6 +353,7 @@ async function openEmergencyModal() {
   if (!modal || !select) return;
 
   modal.classList.remove('hidden');
+  modal.classList.add('flex');
   select.innerHTML = '<option value="">Loading...</option>';
 
   try {
@@ -347,8 +394,316 @@ async function addEmergencyAlert(event) {
 
   document.getElementById('emergency-form').reset();
   document.getElementById('emergency-modal').classList.add('hidden');
+  document.getElementById('emergency-modal').classList.remove('flex');
   window.showToast('Emergency alert posted.');
   await loadEmergencyAlerts();
+}
+
+async function loadCallMeetingData() {
+  try {
+    const today = new Date();
+    const monthInput = document.getElementById('call-meeting-month');
+    if (!monthInput) return;
+
+    if (!monthInput.value) {
+      monthInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    const [yearStr, monthStr] = monthInput.value.split('-');
+    const month = parseInt(monthStr, 10);
+    const year = parseInt(yearStr, 10);
+
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthLabel = document.getElementById('call-meeting-month-label');
+    if (monthLabel) monthLabel.innerText = `Month view for ${monthNames[month - 1]} ${year}`;
+
+    const todayLabel = document.getElementById('call-meeting-current-date');
+    if (todayLabel) {
+      todayLabel.innerText = `Today: ${today.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`;
+    }
+
+    const { response, data } = await window.apiFetchJson(`/api/call_meeting_tracker?month=${month}&year=${year}`);
+    if (!response.ok) return;
+    currentCallMeetingRecords = data || [];
+    renderCallMeetingTable(currentCallMeetingRecords, month, year);
+  } catch (error) {
+    console.error('Call/Meeting Load Error', error);
+  }
+}
+
+function renderCallMeetingTable(records, month, year) {
+  const headerRow = document.getElementById('call_meeting_header_row');
+  const tbody = document.getElementById('call_meeting_table_body');
+  if (!headerRow || !tbody) return;
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const today = new Date();
+  const todayDay = today.getDate();
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
+
+  let headersHtml = `<th class="call-meeting-name-col sticky left-0 z-20 whitespace-nowrap bg-emerald-600 px-3 py-2 text-left text-white shadow-md"><span class="text-sm font-semibold tracking-wide">Name</span></th>`;
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const isTodayCol = isCurrentMonth && day === todayDay;
+    headersHtml += `<th class="call-meeting-day-header ${isTodayCol ? 'call-meeting-today' : ''} whitespace-nowrap border-l border-white/20 px-1 py-2 text-center text-[11px] font-semibold">${day}</th>`;
+  }
+  headerRow.innerHTML = headersHtml;
+
+  callMeetingMeta = {};
+  const groupedByName = {};
+  (records || []).forEach((record) => {
+    if (!groupedByName[record.name]) {
+      groupedByName[record.name] = {
+        name: record.name,
+        date_of_admission: record.date_of_admission,
+        days: {},
+      };
+    }
+    groupedByName[record.name].days[record.day] = {
+      id: record._id,
+      status: record.status || record.type || 'Meeting',
+    };
+  });
+
+  const names = Object.keys(groupedByName);
+  if (!names.length) {
+    tbody.innerHTML = `<tr><td colspan="${daysInMonth + 1}" class="p-6 text-center text-gray-400">No entries for this month.</td></tr>`;
+    return;
+  }
+
+  const rows = names.map((name) => {
+    const person = groupedByName[name];
+    callMeetingMeta[name] = { date_of_admission: person.date_of_admission, days: person.days };
+    let rowHtml = `<td class="call-meeting-name-col sticky left-0 z-20 whitespace-nowrap border-r bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-900 md:text-sm"><span class="block truncate">${escapeHtml(person.name)}</span></td>`;
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const dayData = person.days[day];
+      const hasEntry = !!dayData;
+      const isTodayCol = isCurrentMonth && day === todayDay;
+      const cellBadge = hasEntry ? '<i class="fas fa-check text-xs text-emerald-700"></i>' : '';
+      const cellClass = hasEntry ? 'bg-emerald-50 border border-emerald-500' : 'bg-gray-50';
+
+      rowHtml += `<td class="call-meeting-day-cell ${isTodayCol ? 'call-meeting-today' : ''} border p-1 text-center align-middle">
+        <button class="${cellClass} ${isTodayCol ? 'call-meeting-today-button' : ''} flex h-7 w-full items-center justify-center rounded text-[11px]"
+          onclick="toggleCallMeeting('${encodeURIComponent(person.name)}', ${day})"
+          title="${hasEntry ? 'Remove entry' : 'Add entry'}">
+          ${cellBadge}
+        </button>
+      </td>`;
+    }
+
+    return `<tr class="transition hover:bg-gray-50">${rowHtml}</tr>`;
+  }).join('');
+
+  tbody.innerHTML = rows;
+}
+
+function setupCallMeetingPatientDropdown() {
+  const input = document.getElementById('cm-name');
+  const dropdown = document.getElementById('cm-name-dropdown');
+  const admissionDateInput = document.getElementById('cm-admission-date');
+  if (!input || !dropdown || !admissionDateInput) return;
+
+  const activePatients = dashboardState.patientsData
+    .filter((patient) => !patient.isDischarged)
+    .map((patient) => ({
+      id: patient._id || patient.id,
+      name: patient.name,
+      admissionDate: patient.admissionDate,
+    }));
+
+  let selectedPatientId = null;
+  let selectedAdmissionDate = '';
+
+  function renderDropdown(filter = '') {
+    const filtered = activePatients.filter((patient) =>
+      String(patient.name || '').toLowerCase().includes(filter.toLowerCase())
+    );
+
+    dropdown.innerHTML = '';
+    if (!filtered.length) {
+      dropdown.innerHTML = '<div class="searchable-dropdown-item" style="color: #9ca3af;">No patients found</div>';
+      return;
+    }
+
+    filtered.forEach((patient) => {
+      const item = document.createElement('div');
+      item.className = 'searchable-dropdown-item';
+      item.textContent = patient.name;
+      item.addEventListener('click', () => {
+        input.value = patient.name;
+        selectedPatientId = patient.id;
+        selectedAdmissionDate = patient.admissionDate || '';
+        admissionDateInput.value = selectedAdmissionDate;
+        dropdown.style.display = 'none';
+      });
+      dropdown.appendChild(item);
+    });
+  }
+
+  input.onfocus = () => {
+    renderDropdown(input.value);
+    dropdown.style.display = 'block';
+  };
+  input.oninput = (event) => {
+    renderDropdown(event.target.value);
+    dropdown.style.display = 'block';
+    selectedPatientId = null;
+    selectedAdmissionDate = '';
+    admissionDateInput.value = '';
+  };
+  document.addEventListener('click', (event) => {
+    if (!input.contains(event.target) && !dropdown.contains(event.target)) {
+      dropdown.style.display = 'none';
+    }
+  });
+
+  input.dataset.getSelectedId = () => selectedPatientId;
+  input.dataset.getSelectedAdmissionDate = () => selectedAdmissionDate;
+}
+
+function openCallMeetingModal() {
+  const modal = document.getElementById('call_meeting_modal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+
+  document.getElementById('call_meeting_form')?.reset();
+  document.getElementById('cm-admission-date').value = '';
+
+  const dayInput = document.getElementById('cm-date');
+  const monthInput = document.getElementById('call-meeting-month');
+  if (dayInput && monthInput && monthInput.value) {
+    const [year, month] = monthInput.value.split('-');
+    dayInput.value = `${year}-${month}-01`;
+  }
+
+  fetchPatients().then(() => {
+    setupCallMeetingPatientDropdown();
+  });
+}
+
+async function saveCallMeetingEntry(event) {
+  event.preventDefault();
+
+  const name = document.getElementById('cm-name').value;
+  const admissionDate = document.getElementById('cm-admission-date').value;
+  const scheduledDate = document.getElementById('cm-date').value;
+  const status = document.getElementById('cm-status').value;
+
+  if (!admissionDate) {
+    window.showToast('Please select a patient from the list.', true);
+    return;
+  }
+  if (!scheduledDate) {
+    window.showToast('Please select a date for this entry.', true);
+    return;
+  }
+
+  const parsedDate = new Date(`${scheduledDate}T00:00:00`);
+  const payload = {
+    name,
+    date_of_admission: admissionDate,
+    day: parsedDate.getDate(),
+    month: parsedDate.getMonth() + 1,
+    year: parsedDate.getFullYear(),
+    type: status,
+    status,
+  };
+
+  const { response } = await window.apiFetchJson('/api/call_meeting_tracker', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (response.ok) {
+    document.getElementById('call_meeting_modal').classList.add('hidden');
+    document.getElementById('call_meeting_modal').classList.remove('flex');
+    window.showToast('Entry saved successfully!');
+    await loadCallMeetingData();
+  } else {
+    window.showToast('Error saving entry. Please try again.', true);
+  }
+}
+
+async function toggleCallMeeting(encodedName, day) {
+  const name = decodeURIComponent(encodedName);
+  const monthInput = document.getElementById('call-meeting-month');
+  const today = new Date();
+  const [yearStr, monthStr] = (
+    monthInput && monthInput.value
+      ? monthInput.value
+      : `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+  ).split('-');
+  const month = parseInt(monthStr, 10);
+  const year = parseInt(yearStr, 10);
+
+  const meta = callMeetingMeta[name] || { days: {} };
+  const existing = meta.days[day];
+  const admissionDate = meta.date_of_admission || '';
+
+  try {
+    if (existing && existing.id) {
+      const { response } = await window.apiFetchJson(`/api/call_meeting_tracker/${existing.id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Delete failed');
+    } else {
+      const { response } = await window.apiFetchJson('/api/call_meeting_tracker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          date_of_admission: admissionDate,
+          day,
+          month,
+          year,
+          type: 'Meeting',
+          status: 'Meeting',
+        }),
+      });
+      if (!response.ok) throw new Error('Save failed');
+    }
+    await loadCallMeetingData();
+  } catch (error) {
+    console.error('Toggle call/meeting failed', error);
+    window.showToast('Could not update entry. Please try again.', true);
+  }
+}
+
+function printCallMeetingReport() {
+  const table = document.getElementById('call-meeting-table');
+  const monthValue = document.getElementById('call-meeting-month')?.value || '';
+  if (!table) return;
+
+  const popup = window.open('', '', 'width=1200,height=800');
+  if (!popup) {
+    window.showToast('Please allow pop-ups to print.', true);
+    return;
+  }
+
+  popup.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Call & Meeting Tracker</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+          table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+          th, td { border: 1px solid #d1d5db; padding: 6px; text-align: center; }
+          th { background: #065f46; color: white; }
+          td:first-child, th:first-child { text-align: left; width: 180px; }
+        </style>
+      </head>
+      <body>
+        <h1>Call & Meeting Tracker</h1>
+        <p>${monthValue}</p>
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  popup.document.close();
+  popup.focus();
+  popup.print();
 }
 
 async function loadDailyReport() {
@@ -729,11 +1084,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('open-admissions-btn')?.addEventListener('click', openAdmissionsModal);
   document.getElementById('open-emergency-btn')?.addEventListener('click', openEmergencyModal);
-  document.getElementById('emergency-form')?.addEventListener('submit', addEmergencyAlert);
-  document.getElementById('report-date-picker')?.addEventListener('change', () => {
-    if (canViewReports()) loadDailyReport();
-  });
-  document.getElementById('btn-save-layout')?.addEventListener('click', saveLayoutConfig);
 
   document.querySelectorAll('[data-close-modal]').forEach((button) => {
     button.addEventListener('click', () => closeModalFromButton(button));
@@ -754,6 +1104,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadEmergencyAlerts(),
   ]);
 
+  if (dashboardState.currentUser.role === 'Admin') {
+    await loadCallMeetingData();
+  }
+
   if (canViewReports()) {
     if (canSaveLayouts()) {
       document.getElementById('btn-save-layout')?.classList.remove('hidden');
@@ -766,3 +1120,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 window.markLayoutDirty = markLayoutDirty;
+window.loadDailyReport = loadDailyReport;
+window.printReport = printReport;
+window.saveLayoutConfig = saveLayoutConfig;
+window.openEmergencyModal = openEmergencyModal;
+window.addEmergencyAlert = addEmergencyAlert;
+window.closeAdmissionsModal = closeAdmissionsModal;
+window.openCallMeetingModal = openCallMeetingModal;
+window.saveCallMeetingEntry = saveCallMeetingEntry;
+window.toggleCallMeeting = toggleCallMeeting;
+window.loadCallMeetingData = loadCallMeetingData;
+window.printCallMeetingReport = printCallMeetingReport;
+window.updateDashboard = updateDashboard;

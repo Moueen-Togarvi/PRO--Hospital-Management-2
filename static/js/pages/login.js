@@ -9,8 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const resetTokenInput = document.getElementById('reset-token-input');
 
   const redirectForRole = (role) => {
-    const dashboardRoles = new Set(['Admin', 'Doctor', 'Psychologist', 'Canteen']);
-    return dashboardRoles.has(role) ? '/dashboard' : '/legacy';
+    const dashboardRoles = new Set(['Admin', 'Doctor', 'Psychologist', 'Canteen', 'Staff']);
+    if (dashboardRoles.has(role)) return '/dashboard';
+    if (role === 'Family') return '/family-dashboard';
+    if (role === 'General Staff') return '/staff-dashboard';
+    return '/dashboard';
   };
 
   const openModal = (id) => {
@@ -181,4 +184,3 @@ document.addEventListener('DOMContentLoaded', () => {
     window.__patternResizeTimer = window.setTimeout(generatePattern, 180);
   });
 });
-

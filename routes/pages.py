@@ -12,10 +12,6 @@ def register_page_routes(app, mongo, object_id_cls):
             return response
         return redirect(url_for(page_context.home_endpoint_for(user)))
 
-    @app.route("/legacy")
-    def legacy_app():
-        return render_template("index.html")
-
     @app.route("/login")
     def login_page():
         user = page_context.get_session_user()

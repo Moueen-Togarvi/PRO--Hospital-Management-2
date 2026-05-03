@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section id="user-management-view" class="view-section -mx-4 -my-5 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
+  <h2 class="mb-6 text-2xl font-bold">User Management</h2>
+  <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+    <div class="col-span-1 rounded bg-white p-6 shadow">
+      <h3 class="mb-4 font-bold">Create User</h3>
+      <form onsubmit="createUser(event)">
+        <input name="new-name" class="mb-2 w-full rounded border p-2" placeholder="Name" required />
+        <input name="new-username" class="mb-2 w-full rounded border p-2" placeholder="Username" required />
+        <input name="new-email" type="email" class="mb-2 w-full rounded border p-2" placeholder="Email" required />
+        <input name="new-password" type="password" class="mb-2 w-full rounded border p-2" placeholder="Password" required />
+        <select name="new-role" class="mb-2 w-full rounded border p-2" id="new-user-role" onchange="togglePatientSelect()">
+          <option value="Admin">Admin</option>
+          <option value="Doctor">Doctor</option>
+          <option value="Psychologist">Psychologist</option>
+          <option value="Canteen">Canteen</option>
+          <option value="General Staff">General Staff</option>
+          <option value="Family">Family</option>
+        </select>
+
+        <div id="new-user-patients-group" class="mb-4 hidden">
+          <label class="mb-1 block text-[10px] font-bold uppercase text-gray-400">Assign Patients</label>
+          <div id="new-user-patients-list" class="max-h-40 space-y-1 overflow-y-auto rounded border bg-gray-50 p-2">
+          </div>
+        </div>
+        <button class="w-full rounded bg-blue-600 p-2 font-semibold text-white shadow-md transition hover:bg-blue-700">
+          Create
+        </button>
+      </form>
+    </div>
+
+    <div class="kpi-card col-span-2" style="padding: 0; border-color: rgba(16, 185, 129, 0.2)">
+      <div class="table-scroll-shell w-full overflow-x-auto" style="--table-scroll-max-height: 24rem;">
+        <table class="min-w-full divide-y divide-emerald-100">
+          <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
+            <tr>
+              <th class="whitespace-nowrap px-6 py-3 text-left font-semibold">Name</th>
+              <th class="whitespace-nowrap px-6 py-3 text-left font-semibold">User</th>
+              <th class="whitespace-nowrap px-6 py-3 text-left font-semibold">Role</th>
+              <th class="whitespace-nowrap px-6 py-3 text-center font-semibold">Shift (D/N)</th>
+              <th class="whitespace-nowrap px-6 py-3 text-center font-semibold">Action</th>
+            </tr>
+          </thead>
+          <tbody id="user-table-body" class="divide-y divide-emerald-50"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="user-link-patients-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900 bg-opacity-50">
+  <div class="mx-4 w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
+    <div class="mb-4 flex items-start justify-between">
+      <div>
+        <h3 class="text-xl font-bold text-gray-900">Manage Patient Links</h3>
+        <p class="text-sm text-gray-600">Select patients this user can see in their portal.</p>
+      </div>
+      <button onclick="closeUserLinkModal()" class="text-gray-400 hover:text-gray-600">
+        <i class="fas fa-times text-lg"></i>
+      </button>
+    </div>
+
+    <input type="hidden" id="link-user-id" />
+    <div class="mb-4">
+      <input type="text" id="link-patient-search" placeholder="Search patients..." class="mb-2 w-full rounded border px-3 py-2" onkeyup="filterLinkPatients()" />
+      <div id="link-patients-list" class="max-h-60 space-y-1 overflow-y-auto rounded border bg-gray-50 p-2"></div>
+    </div>
+
+    <div class="flex gap-3 pt-2">
+      <button onclick="saveUserPatientLinks()" class="flex-1 rounded bg-emerald-600 py-2 font-semibold text-white transition hover:bg-emerald-700">
+        Save Links
+      </button>
+      <button type="button" onclick="closeUserLinkModal()" class="flex-1 rounded bg-gray-100 py-2 font-semibold text-gray-700 transition hover:bg-gray-200">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{{ url_for('static', filename='js/pages/users.js') }}"></script>
+{% endblock %}

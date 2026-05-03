@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section id="overheads-view" class="view-section -mx-4 -my-5 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
+  <div class="mb-8">
+    <div class="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+      <div>
+        <h2 class="text-2xl font-bold text-green-900">
+          <i class="fas fa-coins mr-2"></i>Overheads & Finance
+        </h2>
+        <p class="text-sm text-gray-500">Monthly financial projection: Expected Incoming Fees vs. Estimated Costs.</p>
+      </div>
+
+      <div class="flex items-center gap-2 rounded-lg border border-emerald-100 bg-white p-2 shadow-sm">
+        <select id="finance-month-select" class="rounded border px-3 py-2 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500">
+          <option value="1">January</option>
+          <option value="2">February</option>
+          <option value="3">March</option>
+          <option value="4">April</option>
+          <option value="5">May</option>
+          <option value="6">June</option>
+          <option value="7">July</option>
+          <option value="8">August</option>
+          <option value="9">September</option>
+          <option value="10">October</option>
+          <option value="11">November</option>
+          <option value="12">December</option>
+        </select>
+        <select id="finance-year-select" class="rounded border px-3 py-2 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500"></select>
+        <button onclick="renderOverheads()" class="rounded bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
+          <i class="fas fa-sync-alt mr-1"></i> Load
+        </button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+      <div class="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-5 shadow-sm">
+        <div class="z-10">
+          <span class="text-xs font-bold uppercase tracking-wide text-emerald-600"><i class="fas fa-arrow-down mr-1"></i> Total Expected Incoming</span>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span id="overhead-total-income" class="text-3xl font-extrabold text-emerald-700">PKR 0</span>
+            <span class="text-xs font-medium text-emerald-600 opacity-80">(Fees from Active Patients)</span>
+          </div>
+        </div>
+        <div class="pointer-events-none absolute right-0 top-0 h-full w-24 bg-gradient-to-l from-emerald-100/50 to-transparent"></div>
+      </div>
+
+      <div class="relative overflow-hidden rounded-xl border border-red-200 bg-red-50 px-6 py-5 shadow-sm">
+        <div class="z-10">
+          <span class="text-xs font-bold uppercase tracking-wide text-red-600"><i class="fas fa-arrow-up mr-1"></i> Total Estimated Overheads</span>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span id="grand-overhead-total" class="text-3xl font-extrabold text-red-700">PKR 0</span>
+          </div>
+          <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border border-red-100 bg-red-100/30 p-2 text-[10px] font-medium uppercase tracking-tight text-red-600/80">
+            <div class="flex justify-between border-b border-red-100 pb-0.5"><span>Salaries:</span> <span id="total-salary-display" class="font-bold">0</span></div>
+            <div class="flex justify-between border-b border-red-100 pb-0.5"><span>Bills:</span> <span id="total-bills-display" class="font-bold">0</span></div>
+            <div class="flex justify-between border-b border-red-100 pb-0.5"><span>Kitchen:</span> <span id="total-kitchen-display" class="font-bold">0</span></div>
+            <div class="flex justify-between border-b border-red-100 pb-0.5"><span>Canteen:</span> <span id="total-canteen-display" class="font-bold">0</span></div>
+            <div class="flex justify-between"><span>Others:</span> <span id="total-others-display" class="font-bold">0</span></div>
+            <div class="flex justify-between"><span>Advance:</span> <span id="total-advance-display" class="font-bold">0</span></div>
+          </div>
+        </div>
+        <div class="pointer-events-none absolute right-0 top-0 h-full w-24 bg-gradient-to-l from-red-100/50 to-transparent"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mb-10">
+    <div class="mb-4 flex items-center justify-between">
+      <h3 class="text-xl font-bold text-gray-800"><i class="fas fa-users mr-2"></i>Staff Salaries</h3>
+      <button onclick="openEmployeeModal()" class="rounded bg-emerald-600 px-3 py-1 text-sm text-white shadow-md transition hover:bg-emerald-700">
+        <i class="fas fa-plus mr-1"></i> Add Employee
+      </button>
+    </div>
+    <div class="kpi-card overflow-hidden" style="padding: 0; border-color: rgba(16, 185, 129, 0.2)">
+      <div class="table-scroll-shell overflow-x-auto" style="--table-scroll-max-height: 24rem;">
+        <table class="min-w-full divide-y divide-emerald-100">
+          <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
+            <tr>
+              <th class="px-4 py-3 text-center text-xs uppercase">S.No</th>
+              <th class="px-4 py-3 text-left text-xs uppercase">Name</th>
+              <th class="px-4 py-3 text-left text-xs uppercase">Designation</th>
+              <th class="px-4 py-3 text-left text-xs uppercase">Pay</th>
+              <th class="px-4 py-3 text-left text-xs uppercase">Advance</th>
+              <th class="px-4 py-3 text-left text-xs uppercase">Remaining</th>
+              <th class="px-4 py-3 text-left text-xs uppercase">Contact</th>
+              <th class="px-4 py-3 text-center text-xs uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="team-table-body" class="divide-y divide-emerald-50 bg-white"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="mb-4 flex items-center justify-between">
+      <h3 class="text-xl font-bold text-gray-800"><i class="fas fa-file-invoice mr-2"></i>Pending Utility Bills</h3>
+    </div>
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+      <div class="col-span-1 h-fit rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h4 class="mb-3 text-sm font-bold uppercase text-gray-700">Add New Bill</h4>
+        <form onsubmit="addUtilityBill(event)">
+          <div class="mb-3 grid grid-cols-2 gap-3">
+            <div>
+              <label class="mb-1 block text-xs font-bold text-gray-500">Type</label>
+              <select id="bill-type" class="w-full rounded bg-gray-50 p-2 text-sm border">
+                <option value="Electricity">Electricity</option>
+                <option value="Gas">Gas</option>
+                <option value="Internet">Internet</option>
+                <option value="Water">Water</option>
+                <option value="Rent">Rent</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label class="mb-1 block text-xs font-bold text-gray-500">Amount</label>
+              <input id="bill-amount" type="number" class="w-full rounded border p-2 text-sm" placeholder="0" required />
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="mb-1 block text-xs font-bold text-gray-500">Due Date</label>
+            <input id="bill-due-date" type="date" class="w-full rounded border p-2 text-sm" required />
+          </div>
+          <div class="mb-4">
+            <label class="mb-1 block text-xs font-bold text-gray-500">Ref / Note</label>
+            <input id="bill-ref" type="text" class="w-full rounded border p-2 text-sm" placeholder="Ref ID" />
+          </div>
+          <button class="w-full rounded bg-green-600 py-2 text-sm font-bold text-white shadow hover:bg-green-700">
+            Add Bill
+          </button>
+        </form>
+      </div>
+
+      <div class="col-span-1 lg:col-span-2">
+        <div id="bills-grid" class="grid grid-cols-1 gap-4 md:grid-cols-2"></div>
+        <div id="bills-empty-state" class="hidden flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white py-8 text-gray-400">
+          <i class="fas fa-check-circle mb-2 text-3xl text-green-200"></i>
+          <p class="text-sm">No pending bills.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-12 border-t-2 border-dashed border-gray-300 pt-8">
+    <div class="mb-6">
+      <h2 class="flex items-center text-xl font-bold text-indigo-900"><i class="fas fa-history mr-2"></i> Old Balance / Recoveries</h2>
+      <p class="text-sm text-gray-500">Track outstanding balances and recovery commitments.</p>
+    </div>
+
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+      <div class="col-span-1 h-fit rounded-xl border border-indigo-100 bg-white p-6 shadow-sm">
+        <h4 class="mb-3 text-sm font-bold uppercase text-indigo-800">Add Recovery Record</h4>
+        <form onsubmit="addOldBalance(event)">
+          <div class="mb-3">
+            <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Person Name</label>
+            <input id="ob-name" type="text" class="w-full rounded bg-gray-50 p-2 text-sm border focus:ring-2 focus:ring-indigo-500" placeholder="Name" required />
+          </div>
+          <div class="mb-3">
+            <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Amount (PKR)</label>
+            <input id="ob-amount" type="number" class="w-full rounded border p-2 text-sm" placeholder="0" required />
+          </div>
+          <div class="mb-4 grid grid-cols-2 gap-3">
+            <div>
+              <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Commitment Date</label>
+              <input id="ob-commit-date" type="date" class="w-full rounded border p-2 text-sm" required />
+            </div>
+            <div>
+              <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Last Call Date</label>
+              <input id="ob-call-date" type="date" class="w-full rounded border p-2 text-sm" required />
+            </div>
+          </div>
+          <button class="w-full rounded-lg bg-indigo-600 py-2 text-sm font-bold text-white shadow transition hover:bg-indigo-700">
+            <i class="fas fa-plus mr-2"></i> Add Record
+          </button>
+        </form>
+      </div>
+
+      <div class="col-span-1 lg:col-span-2">
+        <div class="overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-sm">
+          <div class="table-scroll-shell overflow-x-auto" style="--table-scroll-max-height: 24rem;">
+            <table class="min-w-full divide-y divide-indigo-100">
+              <thead class="bg-indigo-50 text-indigo-900">
+                <tr>
+                  <th class="px-4 py-3 text-center text-xs font-bold uppercase">#</th>
+                  <th class="px-4 py-3 text-left text-xs font-bold uppercase">Name</th>
+                  <th class="px-4 py-3 text-left text-xs font-bold uppercase">Amount</th>
+                  <th class="px-4 py-3 text-left text-xs font-bold uppercase">Commitment</th>
+                  <th class="px-4 py-3 text-left text-xs font-bold uppercase">Last Call</th>
+                  <th class="px-4 py-3 text-center text-xs font-bold uppercase">Action</th>
+                </tr>
+              </thead>
+              <tbody id="old-balance-body" class="divide-y divide-gray-50 bg-white text-sm"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="employee-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900 bg-opacity-50">
+  <div class="mx-4 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl">
+    <div class="mb-6 flex items-center justify-between">
+      <h3 class="text-2xl font-bold text-green-900" id="emp-modal-title">
+        <i class="fas fa-user-tie mr-2"></i>Add Employee
+      </h3>
+      <button onclick="closeEmployeeModal()" class="text-2xl text-gray-400 hover:text-gray-600">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <form id="employee-form" onsubmit="saveEmployee(event)">
+      <input type="hidden" id="emp-id" />
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Name *</label>
+          <input type="text" id="emp-name" class="w-full rounded border p-2" placeholder="Full Name" required />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Designation *</label>
+          <input type="text" id="emp-designation" class="w-full rounded border p-2" placeholder="e.g. CEO, Medical Officer, Cook" required />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Pay</label>
+          <input type="text" id="emp-pay" class="w-full rounded border p-2" placeholder="Salary Amount" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Advance</label>
+          <input type="text" id="emp-advance" class="w-full rounded border p-2" placeholder="Advance Taken" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Duty Timings</label>
+          <input type="text" id="emp-timings" class="w-full rounded border p-2" placeholder="e.g. 9am to 5pm" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Date of Joining</label>
+          <input type="text" id="emp-joining" class="w-full rounded border p-2" placeholder="e.g. September 4, 2024" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">CNIC #</label>
+          <input type="text" id="emp-cnic" class="w-full rounded border p-2" placeholder="XXXXX-XXXXXXX-X" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Phone #</label>
+          <input type="text" id="emp-phone" class="w-full rounded border p-2" placeholder="03XX-XXXXXXX" />
+        </div>
+      </div>
+
+      <div class="mt-6 flex gap-3">
+        <button type="submit" class="flex-1 rounded-lg bg-green-600 py-3 font-semibold text-white transition hover:bg-green-700">
+          <i class="fas fa-save mr-2"></i>Save Details
+        </button>
+        <button type="button" onclick="closeEmployeeModal()" class="flex-1 rounded-lg bg-gray-200 py-3 font-semibold text-gray-700 transition hover:bg-gray-300">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{{ url_for('static', filename='js/pages/overheads.js') }}"></script>
+{% endblock %}

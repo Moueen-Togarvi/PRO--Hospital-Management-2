@@ -2,243 +2,409 @@
 
 {% block extra_styles %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}" />
+  <style>
+    .blinking-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #dc2626;
+      box-shadow: 0 0 0 rgba(220, 38, 38, 0.45);
+      animation: blinking-dot-pulse 1.4s infinite;
+    }
+
+    @keyframes blinking-dot-pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
+      70% { transform: scale(1); box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+    }
+
+    #day-report-container th:not(:first-child),
+    #day-report-container td:not(:first-child) {
+      width: calc(85% / 10);
+    }
+
+    #night-report-container th:not(:first-child),
+    #night-report-container td:not(:first-child) {
+      width: calc(85% / 16);
+    }
+
+    #day-report-container button,
+    #night-report-container button {
+      min-width: 0;
+      padding: 2px;
+    }
+
+    #call-meeting-table {
+      table-layout: fixed;
+      width: 100%;
+    }
+
+    #call-meeting-table th.call-meeting-name-col,
+    #call-meeting-table td.call-meeting-name-col {
+      width: 140px;
+      min-width: 140px;
+      max-width: 200px;
+    }
+
+    .call-meeting-day-header,
+    .call-meeting-day-cell {
+      width: 32px;
+      min-width: 28px;
+    }
+
+    .call-meeting-day-cell button {
+      height: 1.75rem;
+      padding: 0;
+    }
+
+    .call-meeting-today {
+      background: #65edb9 !important;
+      color: #ffffff !important;
+      font-weight: 700;
+      border: none !important;
+    }
+
+    .call-meeting-today-button {
+      box-shadow: none;
+      border: none !important;
+      background: transparent !important;
+    }
+
+    .call-meeting-day-header.call-meeting-today {
+      font-weight: 800;
+      border: none !important;
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
-<section class="space-y-8">
-  <div class="migration-banner">
-    <div>
-      <p class="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-500">Migration In Progress</p>
-      <h3 class="mt-1 text-xl font-black text-emerald-950">This is the new page-based dashboard.</h3>
-      <p class="mt-2 max-w-3xl text-sm font-medium text-emerald-800/80">
-        Login and dashboard now have their own URLs and separate frontend files. Remaining modules are still available in the legacy workspace while we keep splitting the app safely.
-      </p>
+<section id="dashboard-view" class="view-section -mx-4 -my-5 p-4 md:-mx-8 md:-my-8 md:p-8">
+  <div class="relative mb-8 overflow-hidden rounded-2xl border border-red-200 bg-red-50/40 p-6 shadow-sm">
+    <div class="absolute top-0 right-0 p-8 opacity-5">
+      <i class="fas fa-heartbeat text-8xl text-red-600"></i>
     </div>
-    <a href="/legacy" class="app-secondary-btn whitespace-nowrap">
-      <i class="fas fa-layer-group"></i>
-      <span>Open Legacy Workspace</span>
-    </a>
-  </div>
-
-  <div class="dashboard-main-grid">
-    <section class="panel-card p-6">
-      <div class="dashboard-overview-head">
-        <div class="min-w-0">
-          <p class="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-500">Overview</p>
-          <h3 class="mt-1 text-2xl font-black tracking-tight text-slate-950">Hospital Snapshot</h3>
-          <p class="mt-2 text-sm font-medium text-slate-500">Live operational summary from the new dashboard route.</p>
-        </div>
-        <div class="dashboard-overview-tools">
-          <div class="status-pill">
-            <i class="fas fa-calendar-day text-emerald-600"></i>
-            <span id="current-date">Loading date...</span>
-          </div>
-          <div class="status-pill">
-            <i class="fas fa-clock text-emerald-600"></i>
-            <span id="current-time">Loading time...</span>
-          </div>
-          <button id="open-admissions-btn" class="app-secondary-btn">
-            <i class="fas fa-user-plus"></i>
-            <span>Month Admissions</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="dashboard-kpi-grid mt-6">
-        <a href="/patients" class="kpi-card block">
-          <div class="kpi-icon bg-emerald-600 text-white"><i class="fas fa-users"></i></div>
-          <p class="kpi-label">Active Patients</p>
-          <p id="dash-total" class="kpi-value">0</p>
-          <p class="kpi-sub">Current admitted census</p>
-        </a>
-        <a href="/patients" class="kpi-card block">
-          <div class="kpi-icon bg-cyan-500 text-white"><i class="fas fa-user-plus"></i></div>
-          <p id="dash-month-label" class="kpi-label">Month</p>
-          <div class="kpi-split mt-4">
-            <div class="kpi-stat-block">
-              <p id="dash-admitted" class="kpi-value kpi-value-sm">0</p>
-              <p class="kpi-sub">Admissions</p>
-            </div>
-            <div class="kpi-stat-block kpi-stat-block-right">
-              <p id="dash-discharged" class="kpi-value kpi-value-sm">0</p>
-              <p class="kpi-sub">Discharges</p>
-            </div>
-          </div>
-        </a>
-        <article class="kpi-card">
-          <div class="kpi-icon bg-violet-500 text-white"><i class="fas fa-brain"></i></div>
-          <p class="kpi-label">Psych Sessions</p>
-          <p id="dash-psy-sessions" class="kpi-value">0</p>
-          <p class="kpi-sub">Sessions logged today</p>
-        </article>
-        <article id="dash-income-card" class="kpi-card">
-          <div class="kpi-icon bg-amber-500 text-white"><i class="fas fa-wallet"></i></div>
-          <p class="kpi-label">Expected Balance</p>
-          <p id="dash-income" class="kpi-value kpi-value-sm">Rs 0</p>
-          <p class="kpi-sub">Outstanding active dues</p>
-        </article>
-      </div>
-
-      <div class="dashboard-secondary-kpi-grid mt-4">
-        <article id="dash-canteen-card" class="kpi-card kpi-muted">
-          <div class="kpi-icon bg-emerald-500 text-white"><i class="fas fa-utensils"></i></div>
-          <p class="kpi-label">Canteen This Month</p>
-          <p id="dash-canteen" class="kpi-value kpi-value-sm">Rs 0</p>
-          <p class="kpi-sub">Sales synced from canteen entries</p>
-        </article>
-        <article id="dash-expenses-card" class="kpi-card kpi-muted">
-          <div class="kpi-icon bg-rose-500 text-white"><i class="fas fa-receipt"></i></div>
-          <p class="kpi-label">Expenses This Month</p>
-          <p id="dash-expenses" class="kpi-value kpi-value-sm">Rs 0</p>
-          <p class="kpi-sub">Outgoing financial entries</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="panel-card p-6">
-      <div class="dashboard-panel-head">
-        <div class="min-w-0">
-          <p class="text-[11px] font-black uppercase tracking-[0.25em] text-red-500">Emergency Feed</p>
-          <h3 class="mt-1 text-xl font-black tracking-tight text-slate-950">Critical Alerts</h3>
-        </div>
-        <button id="open-emergency-btn" class="app-danger-btn">
-          <i class="fas fa-plus"></i>
-          <span>Add Alert</span>
-        </button>
-      </div>
-      <div id="emergency-list" class="mt-5 grid gap-4">
-        <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm font-semibold text-slate-400">
-          Loading active alerts...
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <section id="daily-report-section" class="panel-card p-6">
-    <div class="dashboard-report-head">
-      <div class="min-w-0">
-        <p class="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-500">Reports</p>
-        <h3 class="mt-1 text-2xl font-black tracking-tight text-slate-950">Shift Handover Reports</h3>
-        <p class="mt-2 text-sm font-medium text-slate-500">Editable day and night report tables with saved layout support.</p>
-      </div>
-      <div class="dashboard-report-tools">
-        <input type="date" id="report-date-picker" class="app-date-input" />
-        <button type="button" data-print-report="day" class="app-secondary-btn">
-          <i class="fas fa-sun"></i>
-          <span>Print Day</span>
-        </button>
-        <button type="button" data-print-report="night" class="app-secondary-btn">
-          <i class="fas fa-moon"></i>
-          <span>Print Night</span>
-        </button>
-        <button type="button" data-print-report="both" class="app-primary-btn">
-          <i class="fas fa-print"></i>
-          <span>Print Full</span>
-        </button>
-        <button id="btn-save-layout" type="button" class="app-secondary-btn hidden">
-          <i class="fas fa-save"></i>
-          <span>Save Layout</span>
-        </button>
-      </div>
-    </div>
-
-    <div id="reports-no-access" class="mt-6 hidden rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold text-amber-800">
-      Your current role does not have access to the daily report API on the new dashboard page yet.
-    </div>
-
-    <div id="reports-content" class="mt-6 space-y-8">
-      <div id="day-report-container" class="report-card">
-        <div class="mb-3 flex items-center gap-3 px-1">
-          <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-600"><i class="fas fa-sun"></i></div>
-          <div>
-            <h4 class="text-lg font-black text-slate-900">Day Report</h4>
-            <p class="text-xs font-medium text-slate-500">08:00 AM to 07:00 PM workflow</p>
-          </div>
-        </div>
-        <div class="table-card">
-          <div class="table-scroll-shell overflow-x-auto" style="--table-scroll-max-height: 26rem;">
-            <table class="min-w-full divide-y divide-emerald-100 text-xs">
-              <thead class="bg-emerald-600 text-white">
-                <tr id="day-header-row"></tr>
-              </thead>
-              <tbody id="day-table-body" class="divide-y divide-emerald-50 bg-white"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div id="night-report-container" class="report-card">
-        <div class="mb-3 flex items-center gap-3 px-1">
-          <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600"><i class="fas fa-moon"></i></div>
-          <div>
-            <h4 class="text-lg font-black text-slate-900">Night Report</h4>
-            <p class="text-xs font-medium text-slate-500">08:00 PM to 07:00 AM workflow</p>
-          </div>
-        </div>
-        <div class="table-card">
-          <div class="table-scroll-shell overflow-x-auto" style="--table-scroll-max-height: 26rem;">
-            <table class="min-w-full divide-y divide-indigo-100 text-xs">
-              <thead class="bg-emerald-600 text-white">
-                <tr id="night-header-row"></tr>
-              </thead>
-              <tbody id="night-table-body" class="divide-y divide-indigo-50 bg-white"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-</section>
-
-<div id="admissions-modal" class="app-modal hidden">
-  <div class="app-modal-card app-modal-wide">
-    <div class="mb-5 flex items-start justify-between gap-3">
+    <div class="relative z-10 mb-6 flex items-center justify-between">
       <div>
-        <h3 class="text-xl font-black text-slate-900">Admissions This Month</h3>
-        <p class="text-sm text-slate-500">Latest admitted patients from the current month.</p>
+        <h3 class="flex items-center gap-2 text-xl font-black tracking-tight text-red-600">
+          <span class="blinking-dot"></span>
+          <i class="fas fa-heartbeat"></i>
+          Emergency / Critical Alerts
+        </h3>
+        <p class="mt-1 text-xs font-medium italic text-gray-500">Real-time critical patient observations</p>
       </div>
-      <button type="button" class="modal-close-btn" data-close-modal="admissions-modal">
-        <i class="fas fa-times"></i>
+      <button onclick="openEmergencyModal()"
+        class="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-xs font-black text-white shadow-md transition-all duration-300 hover:bg-red-700">
+        <i class="fas fa-plus"></i> Add Alert
       </button>
     </div>
-    <div id="admissions-month-body" class="max-h-96 space-y-3 overflow-y-auto"></div>
+
+    <div id="emergency-list" class="relative z-10 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+      <div class="col-span-full rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 py-8 text-center">
+        <i class="fas fa-check-circle mb-2 text-3xl text-emerald-400"></i>
+        <p class="text-sm font-bold uppercase tracking-wider text-gray-500">All Clear: No active clinical alerts</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="emergency-modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/60">
+    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+      <h3 class="mb-4 text-lg font-bold text-red-700">Report Emergency Condition</h3>
+      <form onsubmit="addEmergencyAlert(event)" id="emergency-form">
+        <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Select Patient</label>
+        <select id="emer-name" class="mb-3 w-full rounded border bg-gray-50 p-2" required>
+          <option value="">Loading patients...</option>
+        </select>
+
+        <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Condition / Note</label>
+        <textarea id="emer-note" class="mb-3 h-24 w-full rounded border p-2"
+          placeholder="e.g. Low BP 90/60, Chest Pain, High Fever" required></textarea>
+
+        <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Severity Level</label>
+        <select id="emer-severity" class="mb-4 w-full rounded border p-2">
+          <option value="critical">Critical (Red)</option>
+          <option value="warning">Warning (Orange)</option>
+        </select>
+
+        <button type="submit"
+          class="w-full rounded bg-red-600 py-2 font-bold text-white shadow-md transition hover:bg-red-700 active:scale-95">
+          Post Alert
+        </button>
+      </form>
+      <button onclick="document.getElementById('emergency-modal').classList.add('hidden')"
+        class="mt-3 w-full text-sm text-gray-500 hover:text-gray-800">
+        Cancel
+      </button>
+    </div>
+  </div>
+
+  <div class="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div
+      class="group relative cursor-pointer overflow-hidden rounded-xl border border-emerald-200 bg-emerald-100 p-4 shadow-sm transition-all duration-300 hover:bg-emerald-200"
+      onclick="window.navigateTo('patients-view')">
+      <div class="relative z-10 flex h-full flex-col justify-between">
+        <div class="flex items-center justify-between">
+          <span class="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-700">Stats</span>
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
+            <i class="fas fa-users text-sm"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="text-4xl font-black tracking-tighter text-emerald-800" id="dash-total">0</div>
+          <div class="mt-1 text-[10px] font-black uppercase tracking-wider text-emerald-600">Total Patients</div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="group relative cursor-pointer overflow-hidden rounded-xl border border-cyan-200 bg-cyan-50 p-4 shadow-sm transition-all duration-300 hover:bg-cyan-100"
+      onclick="window.navigateTo('patients-view')">
+      <div class="relative z-10 flex h-full flex-col justify-between">
+        <div class="flex items-center justify-between">
+          <span class="text-[9px] font-extrabold uppercase tracking-[0.2em] text-cyan-600" id="dash-month-label">March</span>
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500 text-white">
+            <i class="fas fa-user-plus text-sm"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-end justify-between">
+          <div>
+            <div class="flex items-baseline gap-1">
+              <div class="text-2xl font-black text-cyan-900" id="dash-admitted">0</div>
+              <div class="text-[8px] font-black uppercase text-cyan-500">In</div>
+            </div>
+            <div class="mt-0.5 text-[10px] font-bold text-cyan-700">Monthly In</div>
+          </div>
+          <div class="text-right">
+            <div class="flex items-baseline justify-end gap-1">
+              <div class="text-2xl font-black text-cyan-900" id="dash-discharged">0</div>
+              <div class="text-[8px] font-black uppercase text-cyan-500">Out</div>
+            </div>
+            <div class="mt-0.5 text-[10px] font-bold text-cyan-700">Discharged</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="group relative cursor-pointer overflow-hidden rounded-xl border border-violet-200 bg-violet-50 p-4 shadow-sm transition-all duration-300 hover:bg-violet-100"
+      onclick="window.navigateTo('psych-sessions-view')">
+      <div class="relative z-10 flex h-full flex-col justify-between">
+        <div class="flex items-center justify-between">
+          <span class="text-[9px] font-extrabold uppercase tracking-[0.2em] text-violet-600">Sessions</span>
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500 text-white">
+            <i class="fas fa-brain text-sm"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="flex items-baseline gap-1">
+            <div class="text-2xl font-black text-violet-800" id="dash-psy-sessions">0</div>
+            <div class="text-[8px] font-black uppercase text-violet-400">Today</div>
+          </div>
+          <div class="mt-0.5 text-[10px] font-bold text-violet-600">Psychology Sessions</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="dash-daily-report-section" class="mt-8 border-t-4 border-emerald-100/50 pt-8">
+    <div class="mb-8 flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
+      <div>
+        <h3 class="flex items-center gap-3 text-2xl font-black tracking-tight text-emerald-900">
+          <div class="rounded-lg bg-emerald-600 p-2 text-white shadow-lg shadow-emerald-200">
+            <i class="fas fa-clipboard-check"></i>
+          </div>
+          Shift Handover Reports
+        </h3>
+        <p class="mt-1 text-sm font-medium text-gray-500">Daily clinical and operational logs</p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-2 shadow-sm">
+        <div class="flex items-center gap-2 border-r border-gray-100 px-3">
+          <i class="fas fa-calendar-alt text-emerald-600"></i>
+          <input type="date" id="report-date-picker" onchange="loadDailyReport()"
+            class="cursor-pointer border-none bg-transparent p-1 text-sm font-black text-emerald-900 focus:ring-0" />
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="printReport('day')"
+            class="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black text-amber-600 transition-all hover:bg-amber-50">
+            <i class="fas fa-sun text-sm"></i> Day
+          </button>
+          <button onclick="printReport('night')"
+            class="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black text-indigo-600 transition-all hover:bg-indigo-50">
+            <i class="fas fa-moon text-sm"></i> Night
+          </button>
+          <button onclick="printReport('both')"
+            class="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700">
+            <i class="fas fa-print"></i> Print Full
+          </button>
+        </div>
+
+        <button id="btn-save-layout" onclick="saveLayoutConfig()"
+          class="hidden rounded-xl bg-gray-900 p-2 text-white shadow-lg transition hover:bg-black"
+          title="Save Table Layout">
+          <i class="fas fa-save"></i>
+        </button>
+      </div>
+    </div>
+
+    <div id="day-report-container" class="mb-8">
+      <div class="mb-2 flex items-center justify-between px-2">
+        <h4 class="text-lg font-bold text-emerald-800">
+          <i class="fas fa-sun mr-2 text-yellow-500"></i>Day Report
+        </h4>
+      </div>
+      <div class="overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-lg">
+        <div class="table-scroll-shell w-full overflow-x-auto" style="--table-scroll-max-height: 26rem;">
+          <table class="relative w-full divide-y divide-emerald-100" style="table-layout: fixed">
+            <thead class="bg-emerald-600 text-white">
+              <tr id="day-header-row"></tr>
+            </thead>
+            <tbody id="day-table-body" class="divide-y divide-emerald-50 bg-white text-xs"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="night-report-container">
+      <div class="mb-2 flex items-center justify-between px-2">
+        <h4 class="text-lg font-bold text-indigo-900">
+          <i class="fas fa-moon mr-2 text-indigo-500"></i>Night Report
+        </h4>
+      </div>
+      <div class="overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-lg">
+        <div class="table-scroll-shell w-full overflow-x-auto" style="--table-scroll-max-height: 26rem;">
+          <table class="relative w-full divide-y divide-indigo-100" style="table-layout: fixed">
+            <thead class="bg-emerald-600 text-white">
+              <tr id="night-header-row"></tr>
+            </thead>
+            <tbody id="night-table-body" class="divide-y divide-indigo-50 bg-white text-xs"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-6 flex flex-wrap justify-end gap-4 text-xs font-semibold text-gray-600">
+      <div class="flex items-center gap-1.5">
+        <div class="h-3 w-3 rounded border border-green-500 bg-green-100"></div>
+        Done
+      </div>
+      <div class="flex items-center gap-1.5">
+        <div class="h-3 w-3 rounded border border-red-500 bg-red-100"></div>
+        Not Done
+      </div>
+      <div class="flex items-center gap-1.5">
+        <div class="h-3 w-3 rounded border border-yellow-500 bg-yellow-100"></div>
+        Emergency/Complain
+      </div>
+    </div>
+  </div>
+
+  <div id="dash-call-meeting-section" class="mt-10 border-t border-emerald-100 pt-10" style="display: none">
+    <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div class="space-y-1">
+        <h3 class="text-2xl font-bold text-green-900">Call & Meeting Tracker</h3>
+        <p class="text-sm text-gray-500" id="call-meeting-month-label">
+          Click a cell to mark a scheduled meeting/call (tick).
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <input type="month" id="call-meeting-month" onchange="loadCallMeetingData()"
+          class="rounded border p-2 text-sm font-bold text-gray-700 shadow-sm focus:ring-2 focus:ring-emerald-500" />
+        <div class="flex items-center gap-1 text-xs text-gray-600 sm:text-sm" aria-live="polite">
+          <i class="fas fa-calendar-day text-emerald-600"></i>
+          <span id="call-meeting-current-date" class="font-semibold"></span>
+        </div>
+        <button onclick="printCallMeetingReport()"
+          class="rounded-lg border border-emerald-600 bg-white px-4 py-2 font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50">
+          <i class="fas fa-print mr-2"></i>Print
+        </button>
+        <button onclick="openCallMeetingModal()"
+          class="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-emerald-700">
+          <i class="fas fa-plus mr-2"></i>Add Entry
+        </button>
+      </div>
+    </div>
+
+    <div class="overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-lg">
+      <div class="table-scroll-shell overflow-x-auto" style="--table-scroll-max-height: 26rem;">
+        <table id="call-meeting-table" class="relative min-w-full divide-y divide-emerald-100">
+          <thead class="bg-emerald-600 text-white">
+            <tr id="call_meeting_header_row"></tr>
+          </thead>
+          <tbody id="call_meeting_table_body" class="divide-y divide-emerald-50 bg-white text-sm"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="mt-4 flex flex-wrap justify-end gap-4 text-xs font-semibold text-gray-600">
+      <div class="flex items-center gap-1.5">
+        <div class="flex h-4 w-4 items-center justify-center rounded-full border border-emerald-500 bg-emerald-100">
+          <i class="fas fa-check text-[10px] text-emerald-700"></i>
+        </div>
+        Click a date cell to add/remove a meeting/call (tick)
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="call_meeting_modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50">
+  <div class="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+    <h2 class="mb-4 text-xl font-bold text-gray-800">Add Call/Meeting Entry</h2>
+    <form onsubmit="saveCallMeetingEntry(event)" id="call_meeting_form">
+      <div class="mb-4">
+        <label class="mb-1 block text-sm font-bold text-gray-700">Patient Name</label>
+        <div class="searchable-dropdown">
+          <input id="cm-name" type="text" class="w-full rounded border p-2" placeholder="Search patient name..."
+            required autocomplete="off" />
+          <div id="cm-name-dropdown" class="searchable-dropdown-list" style="display: none"></div>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="mb-1 block text-sm font-bold text-gray-700">Admission Date</label>
+        <input id="cm-admission-date" type="date" class="w-full rounded border p-2" required readonly />
+      </div>
+      <div class="mb-4 grid grid-cols-2 gap-4">
+        <div>
+          <label class="mb-1 block text-sm font-bold text-gray-700">Scheduled Date</label>
+          <input id="cm-date" type="date" class="w-full rounded border p-2" required />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-bold text-gray-700">Type</label>
+          <select id="cm-status" class="w-full rounded border p-2" required>
+            <option value="Meeting">Meeting (Tick)</option>
+            <option value="Call">Call (Cross)</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="w-full rounded bg-green-600 py-2 text-white">Save</button>
+    </form>
+    <button onclick="document.getElementById('call_meeting_modal').classList.add('hidden')"
+      class="mt-2 w-full py-2 text-gray-500">
+      Cancel
+    </button>
   </div>
 </div>
 
-<div id="emergency-modal" class="app-modal hidden">
-  <div class="app-modal-card">
-    <div class="mb-5 flex items-start justify-between gap-3">
+<div id="admissions-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900 bg-opacity-50">
+  <div class="mx-4 w-full max-w-xl rounded-xl bg-white p-8 shadow-2xl">
+    <div class="mb-4 flex items-start justify-between">
       <div>
-        <h3 class="text-xl font-black text-slate-900">Report Emergency Condition</h3>
-        <p class="text-sm text-slate-500">Post a real-time alert for active clinical issues.</p>
+        <h3 class="text-xl font-bold text-gray-900">Admissions (This Month)</h3>
+        <p class="text-sm text-gray-600">All patients admitted this month.</p>
       </div>
-      <button type="button" class="modal-close-btn" data-close-modal="emergency-modal">
-        <i class="fas fa-times"></i>
+      <button onclick="closeAdmissionsModal()" class="text-gray-400 hover:text-gray-600">
+        <i class="fas fa-times text-lg"></i>
       </button>
     </div>
-    <form id="emergency-form" class="space-y-4">
-      <div>
-        <label class="app-field-label" for="emer-name">Select Patient</label>
-        <select id="emer-name" class="app-field" required>
-          <option value="">Loading patients...</option>
-        </select>
-      </div>
-      <div>
-        <label class="app-field-label" for="emer-note">Condition / Note</label>
-        <textarea id="emer-note" class="app-field min-h-[110px]" placeholder="e.g. Low BP 90/60, chest pain, high fever" required></textarea>
-      </div>
-      <div>
-        <label class="app-field-label" for="emer-severity">Severity</label>
-        <select id="emer-severity" class="app-field">
-          <option value="critical">Critical</option>
-          <option value="warning">Warning</option>
-        </select>
-      </div>
-      <button class="app-danger-btn w-full" type="submit">
-        <i class="fas fa-bell"></i>
-        <span>Post Alert</span>
+
+    <div id="admissions-month-body" class="max-h-80 divide-y divide-emerald-50 overflow-y-auto"></div>
+
+    <div class="mt-6 text-right">
+      <button onclick="closeAdmissionsModal()"
+        class="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white transition hover:bg-emerald-700">
+        Close
       </button>
-    </form>
+    </div>
   </div>
 </div>
 {% endblock %}

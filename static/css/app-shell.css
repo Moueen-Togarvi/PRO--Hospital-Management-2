@@ -258,6 +258,36 @@ h4,
   box-shadow: 0 28px 60px rgba(15, 23, 42, 0.18);
 }
 
+#payment-records-modal .payment-records-dialog {
+  height: min(88vh, 820px);
+  overflow: hidden;
+}
+
+#payment-records-modal .payment-records-body {
+  min-height: 0;
+  overflow: hidden;
+}
+
+#payment-records-modal .payment-records-table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  border: 1px solid rgba(16, 185, 129, 0.14);
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fdfa 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+#payment-records-modal .payment-records-footer {
+  position: relative;
+  z-index: 5;
+  box-shadow: 0 -14px 32px rgba(15, 23, 42, 0.08);
+}
+
+.print-active {
+  display: block !important;
+}
+
 .app-modal-wide {
   width: min(100%, 42rem);
 }
@@ -347,5 +377,34 @@ h4,
 
   .app-shell-content {
     width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  #payment-records-modal .payment-records-dialog {
+    height: min(92vh, 820px);
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #printable-receipt.print-active,
+  #printable-receipt.print-active * {
+    visibility: visible !important;
+  }
+
+  #printable-receipt.print-active {
+    position: absolute;
+    inset: 0;
+    z-index: 9999;
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 1rem 0;
+    overflow: visible !important;
+    background: white !important;
   }
 }

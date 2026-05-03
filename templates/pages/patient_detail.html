@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block extra_styles %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/patient-detail.css') }}" />
+{% endblock %}
+
+{% block content %}
+<section class="space-y-8">
+  <div class="migration-banner">
+    <div>
+      <p class="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-500">Phase 3</p>
+      <h3 class="mt-1 text-xl font-black text-emerald-950">Patient detail is now a real page.</h3>
+      <p class="mt-2 max-w-3xl text-sm font-medium text-emerald-800/80">
+        Profile editing, notes, medical records, and call scheduling context are now handled here on the dedicated patient route.
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      <a href="/patients" class="app-secondary-btn whitespace-nowrap">
+        <i class="fas fa-arrow-left"></i>
+        <span>Back To Patients</span>
+      </a>
+    </div>
+  </div>
+
+  <section class="patient-detail-head panel-card p-6">
+    <div class="patient-detail-head-copy">
+      <p class="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-500">Patient Profile</p>
+      <h2 id="patient-detail-title" class="mt-1 text-2xl font-black tracking-tight text-slate-950">Loading patient...</h2>
+      <p id="patient-detail-subtitle" class="mt-2 text-sm font-medium text-slate-500">Fetching patient information and activity records.</p>
+    </div>
+    <div class="patient-detail-actions">
+      <button id="patient-print-btn" type="button" class="app-secondary-btn whitespace-nowrap">
+        <i class="fas fa-print"></i>
+        <span>Print</span>
+      </button>
+      <a id="patient-bill-preview-link" href="#" target="_blank" rel="noopener" class="app-secondary-btn whitespace-nowrap">
+        <i class="fas fa-eye"></i>
+        <span>Bill Preview</span>
+      </a>
+      <button id="patient-save-btn" type="button" class="app-primary-btn whitespace-nowrap">
+        <i class="fas fa-save"></i>
+        <span>Save Changes</span>
+      </button>
+    </div>
+  </section>
+
+  <div class="patient-detail-grid">
+    <section class="panel-card p-6">
+      <form id="patient-details-form" class="space-y-6">
+        <div class="detail-grid">
+          <div>
+            <label class="app-field-label" for="det-name">Patient Name</label>
+            <input id="det-name" class="app-field" />
+          </div>
+          <div>
+            <label class="app-field-label" for="det-father">Father Name</label>
+            <input id="det-father" class="app-field" />
+          </div>
+          <div>
+            <label class="app-field-label" for="det-admission">Admission Date</label>
+            <input id="det-admission" type="date" class="app-field" />
+          </div>
+          <div>
+            <label class="app-field-label" for="det-id">Patient ID / Record No</label>
+            <input id="det-id" class="app-field" />
+          </div>
+          <div>
+            <label class="app-field-label" for="det-age">Age</label>
+            <input id="det-age" class="app-field" />
+          </div>
+          <div>
+            <label class="app-field-label" for="det-drug">Drug / Case Type</label>
+            <input id="det-drug" class="app-field" />
+          </div>
+          <div>
+            <label class="app-field-label" for="det-cnic">CNIC</label>
+            <input id="det-cnic" class="app-field" />
+          </div>
+          <div>
+            <label class="app-field-label" for="det-contact">Contact No</label>
+            <input id="det-contact" class="app-field" />
+          </div>
+          <div>
+            <label class="app-field-label" for="det-guardian">Guardian Name</label>
+            <input id="det-guardian" class="app-field" />
+          </div>
+          <div>
+            <label class="app-field-label" for="det-relation">Relation</label>
+            <input id="det-relation" class="app-field" />
+          </div>
+          <div>
+            <label class="app-field-label" for="det-area">Area / City</label>
+            <input id="det-area" class="app-field" />
+          </div>
+          <div>
+            <label class="app-field-label" for="det-prev">Previous Admissions</label>
+            <input id="det-prev" class="app-field" />
+          </div>
+          <div class="detail-grid-span">
+            <label class="app-field-label" for="det-address">Address</label>
+            <input id="det-address" class="app-field" />
+          </div>
+          <div class="detail-grid-span">
+            <label class="app-field-label" for="det-complaint">Complaint / Notes</label>
+            <textarea id="det-complaint" class="app-field patient-textarea"></textarea>
+          </div>
+        </div>
+
+        <div>
+          <div class="mb-3">
+            <p class="app-field-label">Patient Photos</p>
+          </div>
+          <div class="detail-photo-grid">
+            <div class="photo-card">
+              <div class="photo-preview-shell">
+                <img id="det-photo1-img" class="photo-preview" alt="Patient photo 1" />
+              </div>
+              <input id="det-photo1-file" type="file" accept="image/*" class="w-full text-sm" />
+              <input id="det-photo1-hidden" type="hidden" />
+            </div>
+            <div class="photo-card">
+              <div class="photo-preview-shell">
+                <img id="det-photo2-img" class="photo-preview" alt="Patient photo 2" />
+              </div>
+              <input id="det-photo2-file" type="file" accept="image/*" class="w-full text-sm" />
+              <input id="det-photo2-hidden" type="hidden" />
+            </div>
+            <div class="photo-card">
+              <div class="photo-preview-shell">
+                <img id="det-photo3-img" class="photo-preview" alt="Patient photo 3" />
+              </div>
+              <input id="det-photo3-file" type="file" accept="image/*" class="w-full text-sm" />
+              <input id="det-photo3-hidden" type="hidden" />
+            </div>
+          </div>
+        </div>
+
+        <section id="financial-settings-card" class="detail-financial-card">
+          <div class="mb-4">
+            <p class="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-500">Financial Settings</p>
+            <h3 class="mt-1 text-lg font-black text-slate-950">Admin Controls</h3>
+          </div>
+          <div class="detail-grid">
+            <div>
+              <label class="app-field-label" for="det-fee">Monthly Fee</label>
+              <input id="det-fee" class="app-field financial-input" />
+            </div>
+            <div>
+              <label class="app-field-label" for="det-received">Received Amount</label>
+              <input id="det-received" class="app-field financial-input" />
+            </div>
+            <div>
+              <label class="app-field-label" for="det-allowance">Canteen Allowance</label>
+              <input id="det-allowance" class="app-field financial-input" />
+            </div>
+            <div>
+              <label class="app-field-label" for="det-laundry-amount">Laundry Amount</label>
+              <input id="det-laundry-amount" type="number" class="app-field financial-input" />
+            </div>
+            <div class="detail-grid-span">
+              <label class="detail-toggle">
+                <input id="det-laundry-status" type="checkbox" class="financial-input" />
+                <span id="det-laundry-label">Enable Laundry Service</span>
+              </label>
+            </div>
+          </div>
+        </section>
+      </form>
+    </section>
+
+    <aside class="patient-detail-side">
+      <section class="panel-card p-6">
+        <p class="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-500">Snapshot</p>
+        <div id="patient-summary-card" class="mt-4 space-y-3"></div>
+      </section>
+
+      <section id="call-info-panel" class="panel-card p-6">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-500">Weekly Call</p>
+            <h3 class="mt-1 text-lg font-black text-slate-950">Call Day Calendar</h3>
+          </div>
+          <span class="rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">Active</span>
+        </div>
+        <div id="next-call-display" class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4"></div>
+        <div class="mt-4">
+          <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Current Month</div>
+          <div id="mini-calendar" class="calendar-grid mt-3"></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <section class="panel-card p-6">
+    <div class="detail-tabs">
+      <button id="notes-tab-btn" type="button" class="detail-tab active" data-tab="notes">Session Notes</button>
+      <button id="records-tab-btn" type="button" class="detail-tab" data-tab="records">Medical Records</button>
+    </div>
+
+    <div id="tab-notes" class="mt-6 detail-tab-panel">
+      <div id="session-notes-list" class="record-list"></div>
+      <form id="session-note-form" class="record-form mt-4">
+        <input id="new-session-note-input" class="app-field" placeholder="Add psychology / counseling note..." />
+        <button class="app-primary-btn whitespace-nowrap" type="submit">
+          <i class="fas fa-plus"></i>
+          <span>Add Note</span>
+        </button>
+      </form>
+      <p id="session-note-permission" class="mt-3 hidden text-sm font-semibold text-amber-700">Only Admin and Psychologist roles can add session notes.</p>
+    </div>
+
+    <div id="tab-med" class="mt-6 detail-tab-panel hidden">
+      <div id="medical-records-list" class="record-list"></div>
+      <form id="medical-record-form" class="record-form-stacked mt-4">
+        <input id="new-med-title" class="app-field" placeholder="Record title" />
+        <textarea id="new-med-details" class="app-field patient-textarea" placeholder="Record details"></textarea>
+        <div>
+          <button class="app-primary-btn whitespace-nowrap" type="submit">
+            <i class="fas fa-plus"></i>
+            <span>Add Medical Record</span>
+          </button>
+        </div>
+      </form>
+      <p id="medical-record-permission" class="mt-3 hidden text-sm font-semibold text-amber-700">Only Admin and Doctor roles can add medical records.</p>
+    </div>
+  </section>
+</section>
+
+<div id="printable-area" class="hidden">
+  <div class="print-container">
+    <div class="print-header">
+      <i class="fas fa-brain print-logo-icon"></i>
+      <div class="print-title-block">
+        <div class="print-pro">PRO</div>
+        <div class="print-sub-pro">PAKISTAN RECOVERY OASIS</div>
+        <div class="print-tagline">Addiction Treatment & Psychological Services</div>
+        <div class="print-tagline"><i class="fas fa-phone mr-1"></i>+966-557385262</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-x-8 text-sm">
+      <div class="print-row"><span class="print-label">Patient's Name:</span><span id="pr-name" class="print-value"></span></div>
+      <div class="print-row"><span class="print-label">Father's Name:</span><span id="pr-father" class="print-value"></span></div>
+      <div class="print-row"><span class="print-label">Admission Date:</span><span id="pr-admission" class="print-value"></span></div>
+      <div class="print-row"><span class="print-label">I.D. No.:</span><span id="pr-id" class="print-value"></span></div>
+      <div class="print-row"><span class="print-label">Age:</span><span id="pr-age" class="print-value"></span></div>
+      <div class="print-row"><span class="print-label">CNIC No.:</span><span id="pr-cnic" class="print-value"></span></div>
+      <div class="print-row"><span class="print-label">Guardian:</span><span id="pr-guardian" class="print-value"></span></div>
+      <div class="print-row"><span class="print-label">Relation:</span><span id="pr-relation" class="print-value"></span></div>
+      <div class="print-row"><span class="print-label">Drug:</span><span id="pr-drug" class="print-value"></span></div>
+      <div class="print-row"><span class="print-label">Contact:</span><span id="pr-contact" class="print-value"></span></div>
+      <div class="print-row"><span class="print-label">Marital Status:</span><span id="pr-marital" class="print-value"></span></div>
+      <div class="print-row"><span class="print-label">Previous Admissions:</span><span id="pr-prev" class="print-value"></span></div>
+      <div class="print-row print-row-span"><span class="print-label">Address:</span><span id="pr-address" class="print-value"></span></div>
+      <div class="print-row print-row-span"><span class="print-label">Complaint:</span><span id="pr-complaint" class="print-value"></span></div>
+    </div>
+
+    <div class="undertaking-block">
+      <h3 class="undertaking-title">Undertaking / Guardian Details</h3>
+      <div class="grid grid-cols-2 gap-x-8 text-sm">
+        <div class="print-row"><span class="print-label">Patient's Name:</span><span id="ur-name" class="print-value"></span></div>
+        <div class="print-row"><span class="print-label">Father's Name:</span><span id="ur-father" class="print-value"></span></div>
+        <div class="print-row"><span class="print-label">Age:</span><span id="ur-age" class="print-value"></span></div>
+        <div class="print-row"><span class="print-label">CNIC No.:</span><span id="ur-cnic" class="print-value"></span></div>
+        <div class="print-row"><span class="print-label">Contact:</span><span id="ur-contact" class="print-value"></span></div>
+        <div class="print-row print-row-span"><span class="print-label">Address:</span><span id="ur-address" class="print-value"></span></div>
+        <div class="print-row print-row-span"><span class="print-label">Authorized By:</span><span id="ur-auth-name" class="print-value"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{{ url_for('static', filename='js/pages/patient-detail.js') }}"></script>
+{% endblock %}

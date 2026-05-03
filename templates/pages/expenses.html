@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section id="expenses-view" class="view-section -mx-4 -my-5 p-4 md:-mx-8 md:-my-8 md:p-8">
+  <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h2 class="text-2xl font-bold text-green-900">Expenses</h2>
+      <p class="text-sm text-gray-500">Track incoming and outgoing money.</p>
+    </div>
+    <div>
+      <button id="add-expense-btn"
+        class="hidden rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white shadow-md transition hover:bg-emerald-700">
+        <i class="fas fa-plus mr-2"></i>Add Entry
+      </button>
+    </div>
+  </div>
+
+  <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div class="kpi-card" style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border-color: rgba(16, 185, 129, 0.2);">
+      <div class="text-sm font-bold text-gray-700">Incoming (Month)</div>
+      <div class="mt-2 text-3xl font-bold text-emerald-700" id="expense-incoming">0</div>
+    </div>
+    <div class="kpi-card" style="background: linear-gradient(135deg, #fee2e2 0%, #fecdd3 100%); border-color: rgba(248, 113, 113, 0.2);">
+      <div class="text-sm font-bold text-gray-700">Outgoing (Month)</div>
+      <div class="mt-2 text-3xl font-bold text-red-600" id="expense-outgoing">0</div>
+    </div>
+    <div class="kpi-card" style="background: linear-gradient(135deg, #e0f2fe 0%, #bfdbfe 100%); border-color: rgba(59, 130, 246, 0.2);">
+      <div class="text-sm font-bold text-gray-700">Net (Month)</div>
+      <div class="mt-2 text-3xl font-bold text-blue-700" id="expense-net">0</div>
+    </div>
+  </div>
+
+  <div class="kpi-card" style="padding: 0; border-color: rgba(16, 185, 129, 0.2);">
+    <div class="table-scroll-shell w-full overflow-x-auto" style="--table-scroll-max-height: 26rem;">
+      <table class="min-w-full divide-y divide-emerald-100">
+        <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
+          <tr>
+            <th class="whitespace-nowrap px-6 py-3 text-left font-semibold">Date</th>
+            <th class="whitespace-nowrap px-6 py-3 text-left font-semibold">Category</th>
+            <th class="whitespace-nowrap px-6 py-3 text-left font-semibold">Type</th>
+            <th class="whitespace-nowrap px-6 py-3 text-right font-semibold">Amount</th>
+            <th class="whitespace-nowrap px-6 py-3 text-left font-semibold">Note</th>
+            <th class="whitespace-nowrap px-6 py-3 text-center font-semibold">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="expenses-table-body" class="divide-y divide-emerald-50"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<div id="expense-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50">
+  <div class="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+    <h2 class="mb-4 text-xl font-bold text-gray-800">Add Expense</h2>
+    <form id="expense-form">
+      <div class="mb-4 grid grid-cols-2 gap-4">
+        <div>
+          <label class="mb-1 block text-sm font-bold text-gray-700">Type</label>
+          <select id="exp-type" class="w-full rounded border p-2" required>
+            <option value="outgoing">Outgoing</option>
+            <option value="incoming">Incoming</option>
+          </select>
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-bold text-gray-700">Amount</label>
+          <input id="exp-amount" type="number" class="w-full rounded border p-2" required />
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="mb-1 block text-sm font-bold text-gray-700">Category</label>
+        <input id="exp-category" type="text" class="w-full rounded border p-2" placeholder="e.g., Utilities, Fees" required />
+      </div>
+      <div class="mb-4">
+        <label class="mb-1 block text-sm font-bold text-gray-700">Date</label>
+        <input id="exp-date" type="date" class="w-full rounded border p-2" />
+      </div>
+      <div class="mb-4">
+        <label class="mb-1 block text-sm font-bold text-gray-700">Note</label>
+        <textarea id="exp-note" class="w-full rounded border p-2" rows="2" placeholder="Optional"></textarea>
+      </div>
+      <button id="save-expense-btn" type="submit" class="w-full rounded bg-emerald-600 py-2 text-white">Save</button>
+    </form>
+    <button id="cancel-expense-btn" class="mt-2 w-full py-2 text-gray-500">Cancel</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{{ url_for('static', filename='js/pages/expenses.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="-mx-4 -my-5 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
+  <div class="mx-auto max-w-4xl rounded-xl bg-white p-6 shadow-2xl">
+    <div class="mb-6 flex items-center justify-between">
+      <h3 class="text-2xl font-bold text-green-900">
+        <i class="fas fa-user-plus mr-2"></i>New Patient Admission
+      </h3>
+      <a href="/patients" class="rounded-lg bg-gray-200 px-4 py-2 font-semibold text-gray-700 transition hover:bg-gray-300">
+        <i class="fas fa-arrow-left mr-2"></i>Back
+      </a>
+    </div>
+
+    <form id="new-admission-form" onsubmit="addNewPatient(event)">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Patient Name *</label>
+          <input type="text" id="new-patient-name" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" placeholder="Enter full name" required />
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Father's Name</label>
+          <input type="text" id="new-patient-father" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" placeholder="Enter father's name" />
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Admission Date *</label>
+          <input type="date" id="new-patient-admission" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" required />
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Age</label>
+          <input type="number" id="new-patient-age" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" placeholder="Enter age" />
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">CNIC</label>
+          <input type="text" id="new-patient-cnic" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" placeholder="XXXXX-XXXXXXX-X" />
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Contact Number</label>
+          <input type="tel" id="new-patient-contact" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" placeholder="03XX-XXXXXXX" />
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Area / City</label>
+          <input type="text" id="new-patient-area" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" placeholder="e.g., DHA Phase 6" />
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Photo 1</label>
+          <input type="file" accept="image/*" id="new-patient-photo1-file" class="w-full text-sm" />
+          <input type="hidden" id="new-patient-photo1-hidden" />
+          <div class="mt-2 flex aspect-video items-center justify-center overflow-hidden rounded border bg-gray-50">
+            <img id="new-patient-photo1-preview" class="h-full w-full object-cover opacity-40" src="https://via.placeholder.com/300x200?text=No+Photo" alt="No photo" />
+          </div>
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Photo 2</label>
+          <input type="file" accept="image/*" id="new-patient-photo2-file" class="w-full text-sm" />
+          <input type="hidden" id="new-patient-photo2-hidden" />
+          <div class="mt-2 flex aspect-video items-center justify-center overflow-hidden rounded border bg-gray-50">
+            <img id="new-patient-photo2-preview" class="h-full w-full object-cover opacity-40" src="https://via.placeholder.com/300x200?text=No+Photo" alt="No photo" />
+          </div>
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Photo 3</label>
+          <input type="file" accept="image/*" id="new-patient-photo3-file" class="w-full text-sm" />
+          <input type="hidden" id="new-patient-photo3-hidden" />
+          <div class="mt-2 flex aspect-video items-center justify-center overflow-hidden rounded border bg-gray-50">
+            <img id="new-patient-photo3-preview" class="h-full w-full object-cover opacity-40" src="https://via.placeholder.com/300x200?text=No+Photo" alt="No photo" />
+          </div>
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Guardian Name</label>
+          <input type="text" id="new-patient-guardian" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" placeholder="Enter guardian name" />
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Monthly Fee</label>
+          <input type="number" id="new-patient-fee" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" placeholder="0" value="0" />
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700" title="Advance Received Payment">Received Amount (Advance)</label>
+          <input type="number" id="new-patient-received" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" placeholder="0" value="0" />
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Address</label>
+          <textarea id="new-patient-address" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" placeholder="Enter complete address" rows="2"></textarea>
+        </div>
+
+        <div>
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Monthly Allowance</label>
+          <input type="number" id="new-patient-allowance" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" placeholder="3000" value="3000" />
+        </div>
+
+        <div class="md:col-span-2">
+          <div class="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <input type="checkbox" id="new-patient-laundry-status" class="h-5 w-5 cursor-pointer rounded border-gray-300 text-emerald-600 focus:ring-2 focus:ring-emerald-500" />
+            <label for="new-patient-laundry-status" class="flex-1 cursor-pointer">
+              <span class="text-sm font-semibold text-gray-700">Enable Laundry Service</span>
+              <p class="mt-0.5 text-xs text-gray-600">If checked, laundry fee will be set to PKR 3,500 (can be changed later)</p>
+            </label>
+          </div>
+        </div>
+
+        <div id="laundry-amount-container" class="hidden">
+          <label class="mb-1 block text-sm font-semibold text-gray-700">Laundry Amount (PKR)</label>
+          <input type="number" id="new-patient-laundry-amount" class="w-full rounded border border-gray-300 p-2 focus:border-transparent focus:ring-2 focus:ring-green-500" placeholder="3500" value="3500" />
+        </div>
+      </div>
+
+      <div class="mt-6 flex gap-3">
+        <button type="submit" class="flex-1 rounded-lg bg-green-600 py-3 font-semibold text-white transition hover:bg-green-700">
+          <i class="fas fa-check mr-2"></i>Admit Patient
+        </button>
+        <a href="/patients" class="flex-1 rounded-lg bg-gray-200 py-3 text-center font-semibold text-gray-700 transition hover:bg-gray-300">
+          <i class="fas fa-times mr-2"></i>Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/pages/admission.js') }}"></script>
+{% endblock %}

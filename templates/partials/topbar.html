@@ -11,15 +11,31 @@
     </div>
 
     <div class="flex items-center gap-3">
+      {% if current_user.role == 'Admin' %}
+      <div id="topbar-financial-controls" class="hidden md:flex items-center gap-2 bg-emerald-100/50 p-1 rounded-xl border border-emerald-100/50">
+        <button onclick="openReceiptModal()"
+          class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-700 transition shadow-sm flex items-center gap-2 text-xs"
+          type="button">
+          <i class="fas fa-receipt"></i> Receipt
+        </button>
+        <button onclick="openPaymentRecordsModal()"
+          class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-700 transition shadow-sm flex items-center gap-2 text-xs"
+          type="button">
+          <i class="fas fa-list-alt"></i> Records
+        </button>
+      </div>
+      {% endif %}
       <div class="hidden rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-right shadow-sm sm:block">
         <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500">{{ current_user.role }}</p>
         <p class="max-w-[220px] truncate text-sm font-black text-emerald-900">{{ current_user.display_name }}</p>
       </div>
-      <a href="/legacy" class="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-700 shadow-sm transition hover:bg-emerald-50">
-        <i class="fas fa-arrow-up-right-from-square"></i>
-        <span>Legacy</span>
+      <a
+        href="{% if current_user.role in ['Admin', 'Doctor', 'Psychologist', 'Canteen'] %}/dashboard{% elif current_user.role == 'Family' %}/family-dashboard{% elif current_user.role == 'General Staff' %}/staff-dashboard{% else %}/{% endif %}"
+        class="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+      >
+        <i class="fas fa-house"></i>
+        <span>Home</span>
       </a>
     </div>
   </div>
 </header>
-

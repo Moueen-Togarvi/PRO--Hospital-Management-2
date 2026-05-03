@@ -5,8 +5,26 @@ class PageContext:
     def __init__(self, mongo, object_id_cls):
         self.mongo = mongo
         self.object_id_cls = object_id_cls
-        self.dashboard_roles = {"Admin", "Doctor", "Psychologist", "Canteen"}
+        self.dashboard_roles = {"Admin", "Doctor", "Psychologist", "Canteen", "Staff"}
+        self.admission_page_roles = {"Admin"}
         self.patient_page_roles = {"Admin"}
+        self.patient_detail_roles = {"Admin", "Doctor", "Psychologist"}
+        self.psych_page_roles = {"Admin", "Psychologist"}
+        self.prescription_page_roles = {"Admin"}
+        self.team_page_roles = {"Admin"}
+        self.utility_bills_page_roles = {"Admin"}
+        self.user_page_roles = {"Admin"}
+        self.account_page_roles = {"Admin"}
+        self.attendance_page_roles = {"Admin"}
+        self.canteen_page_roles = {"Admin", "Canteen"}
+        self.expense_page_roles = {"Admin"}
+        self.export_page_roles = {"Admin"}
+        self.family_dashboard_page_roles = {"Family"}
+        self.manual_discharge_page_roles = {"Admin"}
+        self.overheads_page_roles = {"Admin"}
+        self.monthly_overheads_page_roles = {"Admin"}
+        self.report_page_roles = {"Admin", "Doctor", "Staff"}
+        self.staff_dashboard_page_roles = {"General Staff"}
 
     def clear_session(self):
         session.pop("user_id", None)
@@ -49,9 +67,14 @@ class PageContext:
         role = (user or {}).get("role") or session.get("role")
         if role in self.dashboard_roles:
             return "dashboard_page"
+        if role in self.family_dashboard_page_roles:
+            return "family_dashboard_page"
+        if role in self.staff_dashboard_page_roles:
+            return "staff_dashboard_page"
         if role in self.patient_page_roles:
             return "patients_page"
-        return "legacy_app"
+        self.clear_session()
+        return "login_page"
 
     def ensure_user(self):
         user = self.get_session_user()
@@ -62,10 +85,12 @@ class PageContext:
             return None, redirect(url_for("login_page"))
         return user, None
 
-    def ensure_roles(self, allowed_roles, fallback_endpoint="legacy_app"):
+    def ensure_roles(self, allowed_roles, fallback_endpoint=None):
         user, response = self.ensure_user()
         if response is not None:
             return None, response
         if user["role"] not in allowed_roles:
+            if fallback_endpoint is None:
+                fallback_endpoint = self.home_endpoint_for(user)
             return None, redirect(url_for(fallback_endpoint))
         return user, None

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section id="utility-bills-view" class="view-section -mx-4 -my-5 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
+  <div class="mb-6 flex flex-col justify-between gap-4 md:flex-row">
+    <div>
+      <h2 class="text-2xl font-bold text-green-900">
+        <i class="fas fa-file-invoice mr-2"></i>Utility Bills
+      </h2>
+      <p class="text-sm text-gray-500">Manage pending utility payments.</p>
+    </div>
+
+    <div class="flex min-w-[200px] flex-col items-end rounded-xl border border-red-200 bg-red-50 px-6 py-3">
+      <span class="text-xs font-bold uppercase tracking-wide text-red-600">Total Payable</span>
+      <span id="bill-total-display" class="text-2xl font-extrabold text-red-700">PKR 0</span>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+    <div class="col-span-1 h-fit rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+      <h3 class="mb-4 border-b pb-2 font-bold text-gray-800">Add New Bill</h3>
+      <form onsubmit="addUtilityBill(event)">
+        <div class="mb-3">
+          <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Bill Type</label>
+          <select id="bill-type" class="w-full rounded border bg-gray-50 p-2 focus:ring-2 focus:ring-green-500" required>
+            <option value="Electricity">Electricity (WAPDA)</option>
+            <option value="Gas">Gas (SNGPL)</option>
+            <option value="Internet">Internet / PTCL</option>
+            <option value="Water">Water</option>
+            <option value="Rent">Rent</option>
+            <option value="Maintenance">Maintenance</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Amount (PKR)</label>
+          <input id="bill-amount" type="number" class="w-full rounded border p-2" placeholder="0" required />
+        </div>
+
+        <div class="mb-3">
+          <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Due Date</label>
+          <input id="bill-due-date" type="date" class="w-full rounded border p-2" required />
+        </div>
+
+        <div class="mb-4">
+          <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Reference No / Note</label>
+          <input id="bill-ref" type="text" class="w-full rounded border p-2" placeholder="e.g. Ref ID or Meter No" />
+        </div>
+
+        <button class="w-full rounded-lg bg-green-600 py-2 font-bold text-white shadow transition hover:bg-green-700">
+          <i class="fas fa-plus mr-2"></i> Add Bill
+        </button>
+      </form>
+    </div>
+
+    <div class="col-span-1 lg:col-span-2">
+      <div id="bills-grid" class="grid grid-cols-1 gap-4 md:grid-cols-2"></div>
+
+      <div id="bills-empty-state" class="hidden flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white py-12 text-gray-400">
+        <i class="fas fa-check-circle mb-3 text-4xl text-green-200"></i>
+        <p>No pending bills. Great job!</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/pages/utility_bills.js') }}"></script>
+{% endblock %}

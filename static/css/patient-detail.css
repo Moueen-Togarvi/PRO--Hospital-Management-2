@@ -1,0 +1,310 @@
+.patient-detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.patient-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.patient-detail-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.patient-detail-side {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.detail-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.detail-grid-span {
+  grid-column: 1 / -1;
+}
+
+.patient-textarea {
+  min-height: 120px;
+}
+
+.detail-photo-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.photo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.photo-preview-shell {
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 1.2rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+}
+
+.photo-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.detail-financial-card {
+  border: 1px solid rgba(16, 185, 129, 0.1);
+  border-radius: 1.4rem;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.96));
+  padding: 1.2rem;
+}
+
+.detail-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid rgba(16, 185, 129, 0.12);
+  border-radius: 1rem;
+  background: white;
+  padding: 0.95rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.calendar-day-header {
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.calendar-day {
+  border-radius: 0.8rem;
+  background: #f8fafc;
+  padding: 0.5rem 0.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.calendar-day.today {
+  border: 2px solid #059669;
+}
+
+.calendar-day.call-day {
+  background: #dcfce7;
+  color: #065f46;
+}
+
+.detail-tabs {
+  display: flex;
+  gap: 0.75rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  padding-bottom: 0.8rem;
+}
+
+.detail-tab {
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #64748b;
+  transition: all 0.18s ease;
+}
+
+.detail-tab.active {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.record-list {
+  display: grid;
+  gap: 0.75rem;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.record-item {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 1.1rem;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  padding: 1rem;
+}
+
+.record-form {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr auto;
+}
+
+.record-form-stacked {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.summary-stat {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  padding: 0.9rem 1rem;
+}
+
+@media (min-width: 1100px) {
+  .patient-detail-head {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .patient-detail-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  }
+
+  .detail-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .patient-detail-actions .app-secondary-btn,
+  .patient-detail-actions .app-primary-btn {
+    width: 100%;
+  }
+
+  .record-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+#printable-area {
+  display: none;
+  width: 148mm;
+  min-height: 210mm;
+  margin: 0 auto;
+  background: white;
+  color: #1f2937;
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+
+#printable-area.print-active {
+  display: block !important;
+}
+
+.print-container {
+  width: 100%;
+}
+
+.print-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  border-bottom: 2px solid #10b981;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.print-logo-icon {
+  font-size: 2.8rem;
+  color: #047857;
+}
+
+.print-title-block {
+  text-align: center;
+}
+
+.print-pro {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.print-sub-pro {
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #047857;
+}
+
+.print-tagline {
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+
+.print-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.45rem 0;
+}
+
+.print-row-span {
+  grid-column: span 2;
+}
+
+.print-label {
+  font-weight: 700;
+  color: #374151;
+}
+
+.print-value {
+  font-weight: 600;
+  text-align: right;
+}
+
+.undertaking-block {
+  margin-top: 1.5rem;
+}
+
+.undertaking-title {
+  margin-bottom: 0.75rem;
+  border-left: 4px solid #10b981;
+  padding-left: 0.75rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #printable-area.print-active,
+  #printable-area.print-active * {
+    visibility: visible !important;
+  }
+
+  #printable-area.print-active {
+    position: absolute;
+    inset: 0;
+    z-index: 9999;
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    overflow: visible !important;
+    background: white !important;
+  }
+}

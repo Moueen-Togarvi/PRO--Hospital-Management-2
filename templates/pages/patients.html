@@ -1,116 +1,97 @@
 {% extends "base.html" %}
 
-{% block extra_styles %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/patients.css') }}" />
-{% endblock %}
-
 {% block content %}
-<section class="space-y-8">
-  <div class="migration-banner">
-    <div>
-      <p class="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-500">Phase 2</p>
-      <h3 class="mt-1 text-xl font-black text-emerald-950">Patients directory now has its own URL.</h3>
-      <p class="mt-2 max-w-3xl text-sm font-medium text-emerald-800/80">
-        This page is now split out of the single-file app. Directory browsing, search, KPIs, bill preview, billing trigger, and discharge status updates are handled here. Full patient detail editing still lives in the legacy workspace for now.
-      </p>
-    </div>
-    <div class="flex flex-wrap gap-3">
-      <a href="/dashboard" class="app-secondary-btn whitespace-nowrap">
-        <i class="fas fa-chart-line"></i>
-        <span>Back To Dashboard</span>
-      </a>
-      <a href="/legacy" class="app-secondary-btn whitespace-nowrap">
-        <i class="fas fa-layer-group"></i>
-        <span>Open Legacy Workspace</span>
-      </a>
-    </div>
-  </div>
-
-  <section class="panel-card p-6">
-    <div class="patients-header">
-      <div class="min-w-0">
-        <p class="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-500">Directory</p>
-        <h2 class="mt-1 text-2xl font-black tracking-tight text-slate-950">Patients Directory</h2>
-        <p class="mt-2 text-sm font-medium text-slate-500">Search and monitor current and discharged patients from a dedicated page.</p>
-      </div>
-      <div class="patients-toolbar">
-        <div class="patients-search-wrap">
-          <i class="fas fa-search patients-search-icon"></i>
-          <input type="search" id="patients-search-input" class="patients-search-input" placeholder="Search patients by name..." />
+<section id="patients-view" class="view-section -mx-4 -my-5 space-y-6 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
+  <div class="rounded-[28px] border border-emerald-100 bg-white/80 p-5 shadow-sm shadow-emerald-100/50 backdrop-blur md:p-6">
+    <div class="mb-5 flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+      <div class="flex items-start gap-4">
+        <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-2xl text-[#0b7454] shadow-inner shadow-emerald-200/70">
+          <i class="fas fa-hospital-user"></i>
         </div>
-        <button id="refresh-patients-btn" class="app-secondary-btn whitespace-nowrap">
-          <i class="fas fa-rotate-right"></i>
-          <span>Refresh</span>
-        </button>
-        <a href="/legacy" class="app-primary-btn whitespace-nowrap">
-          <i class="fas fa-user-plus"></i>
-          <span>New Admission</span>
+        <div>
+          <h2 class="text-2xl font-extrabold tracking-tight text-emerald-900">Patients Directory</h2>
+          <p class="text-sm font-medium text-emerald-600/70">Comprehensive view of all hospital admissions</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="relative min-w-[280px] flex-1 xl:flex-none">
+          <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-emerald-600/50">
+            <i class="fas fa-search text-sm"></i>
+          </span>
+          <input
+            type="search"
+            id="patients-search-input"
+            class="w-full rounded-xl border border-emerald-100 bg-white py-2 pl-10 pr-4 text-sm text-gray-700 shadow-sm transition-all placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+            placeholder="Search patients by name..."
+            oninput="handlePatientsSearch(this.value)"
+          />
+        </div>
+        <a
+          href="/export?next=/patients"
+          class="flex items-center rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-bold text-gray-700 shadow-sm transition active:scale-95 hover:border-gray-300"
+        >
+          <i class="fas fa-file-export mr-2 text-gray-400"></i> Export
+        </a>
+        <a
+          id="add-new-patient-btn"
+          href="/admission"
+          class="flex items-center rounded-xl bg-[#0b7454] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition active:scale-95 hover:bg-[#096347]"
+        >
+          <i class="fas fa-plus-circle mr-2 text-lg"></i> Admission
         </a>
       </div>
     </div>
 
-    <div class="patients-kpi-grid mt-6">
-      <article class="kpi-card">
-        <div class="kpi-icon bg-emerald-600 text-white"><i class="fas fa-users"></i></div>
-        <p class="kpi-label">Total Records</p>
-        <p id="patients-total-count" class="kpi-value">0</p>
-        <p class="kpi-sub">Directory rows currently visible</p>
-      </article>
-      <article class="kpi-card">
-        <div class="kpi-icon bg-teal-500 text-white"><i class="fas fa-bed-pulse"></i></div>
-        <p class="kpi-label">Active Patients</p>
-        <p id="patients-active-count" class="kpi-value">0</p>
-        <p class="kpi-sub">Not yet discharged</p>
-      </article>
-      <article class="kpi-card">
-        <div class="kpi-icon bg-slate-500 text-white"><i class="fas fa-file-medical"></i></div>
-        <p class="kpi-label">Discharged</p>
-        <p id="patients-discharged-count" class="kpi-value">0</p>
-        <p class="kpi-sub">Archived or discharged cases</p>
-      </article>
-      <article class="kpi-card">
-        <div class="kpi-icon bg-blue-600 text-white"><i class="fas fa-sack-dollar"></i></div>
-        <p class="kpi-label">Total Collection</p>
-        <p id="patients-total-collection" class="kpi-value kpi-value-sm">Rs 0</p>
-        <p class="kpi-sub">Received amount across visible records</p>
-      </article>
-    </div>
-  </section>
-
-  <section class="panel-card p-0 overflow-hidden">
-    <div class="patients-table-head">
-      <div>
-        <h3 class="text-lg font-black text-slate-900">Directory Table</h3>
-        <p class="text-sm font-medium text-slate-500">Bill actions and discharge status are available here. Deep editing remains in legacy for this phase.</p>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+        <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Total Records</span>
+        <div class="mt-1 text-2xl font-black text-emerald-900" id="patients-total-count">0</div>
       </div>
-      <div id="patients-table-status" class="text-xs font-black uppercase tracking-[0.18em] text-emerald-500">Loading</div>
+      <div class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+        <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Active Patients</span>
+        <div class="mt-1 text-2xl font-black text-emerald-600" id="patients-active-count">0</div>
+      </div>
+      <div class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+        <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Discharged</span>
+        <div class="mt-1 text-2xl font-black text-gray-400" id="patients-discharged-count">0</div>
+      </div>
+      <div class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+        <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Total Collection</span>
+        <div class="mt-1 text-2xl font-black text-blue-600" id="patients-total-collection">Rs 0</div>
+      </div>
     </div>
-    <div class="table-scroll-shell overflow-x-auto patients-table-shell" style="--table-scroll-max-height: 34rem;">
-      <table class="patients-directory-table min-w-full divide-y divide-slate-200">
+  </div>
+
+  <div class="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
+    <div
+      class="patients-table-scroll table-scroll-shell w-full overflow-x-auto overflow-y-auto"
+      style="--table-scroll-max-height: 34rem;"
+    >
+      <table class="patients-directory-table w-full min-w-[1000px] divide-y divide-gray-100" style="font-size: 0.68rem;">
         <thead id="patients-table-headers" class="bg-[#0b7454] text-white">
           <tr>
-            <th class="px-3 py-3 text-center text-[10px] font-black uppercase tracking-[0.18em]">#</th>
-            <th class="px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.18em]">Patient</th>
-            <th class="px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.18em]">Guardian</th>
-            <th class="px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.18em]">Contact</th>
-            <th class="px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.18em]">Admission</th>
-            <th class="px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.18em]">Area</th>
-            <th class="px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.18em]">Fee/Mo</th>
-            <th class="px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.18em]">Stay</th>
-            <th class="px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.18em]">Total Bill</th>
-            <th class="px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.18em]">Received</th>
-            <th class="px-3 py-3 text-center text-[10px] font-black uppercase tracking-[0.18em]">Balance</th>
-            <th class="px-3 py-3 text-center text-[10px] font-black uppercase tracking-[0.18em]">Actions</th>
+            <th class="w-10 px-2 py-2 text-center text-[9px] font-black uppercase tracking-widest shadow-sm">#</th>
+            <th class="w-[105px] px-2 py-2 text-left text-[9px] font-black uppercase tracking-widest">Patient Name</th>
+            <th class="w-[100px] px-2 py-2 text-left text-[9px] font-black uppercase tracking-widest">Guardian</th>
+            <th class="w-[95px] px-2 py-2 text-left text-[9px] font-black uppercase tracking-widest">Contact</th>
+            <th class="px-2 py-2 text-left text-[9px] font-black uppercase tracking-widest">Admission</th>
+            <th class="px-2 py-2 text-left text-[9px] font-black uppercase tracking-widest">Area</th>
+            <th class="px-2 py-2 text-left text-[9px] font-black uppercase tracking-widest">Fee/Mo</th>
+            <th class="px-2 py-2 text-left text-[9px] font-black uppercase tracking-widest">Stay</th>
+            <th class="px-2 py-2 text-left text-[9px] font-black uppercase tracking-widest">Total Bill</th>
+            <th class="px-2 py-2 text-left text-[9px] font-black uppercase tracking-widest">Paid/Advance</th>
+            <th class="px-2 py-2 text-center text-[9px] font-black uppercase tracking-widest">Balance Status</th>
+            <th class="px-2 py-2 text-center text-[9px] font-black uppercase tracking-widest">Actions</th>
           </tr>
         </thead>
-        <tbody id="patients-table-body" class="divide-y divide-slate-100 bg-white"></tbody>
+        <tbody id="patients-table-body" class="divide-y divide-emerald-50"></tbody>
       </table>
     </div>
-  </section>
+  </div>
 </section>
 {% endblock %}
 
 {% block extra_scripts %}
   <script src="{{ url_for('static', filename='js/pages/patients.js') }}"></script>
 {% endblock %}
-

@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section id="manual-discharge-view" class="view-section -mx-4 -my-5 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
+  <div class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
+    <div>
+      <h2 class="text-2xl font-extrabold tracking-tight text-emerald-900">
+        <i class="fas fa-file-medical mr-2"></i>Manual Discharge Receipt
+      </h2>
+      <p class="text-sm text-emerald-700/70">Add, edit, and print manually editable discharge receipts.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <input
+        type="search"
+        id="manual-discharge-search"
+        placeholder="Search name/contact/cnic..."
+        class="w-64 rounded-lg border border-emerald-200 px-3 py-2 text-sm"
+        oninput="handleManualDischargeSearch(this.value)"
+      />
+      <button onclick="openManualDischargeModal()" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white shadow hover:bg-emerald-800">
+        <i class="fas fa-plus mr-1"></i> Add Receipt
+      </button>
+    </div>
+  </div>
+
+  <div class="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
+    <div class="border-b border-emerald-100 bg-emerald-50 px-4 py-3">
+      <h3 class="text-sm font-bold uppercase tracking-wide text-emerald-900">Patients List (Manual Blank Fields)</h3>
+    </div>
+    <div class="table-scroll-shell overflow-x-auto" style="--table-scroll-max-height: 18rem;">
+      <table class="min-w-full divide-y divide-gray-100 text-xs">
+        <thead class="bg-[#0b7454] text-white">
+          <tr>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">#</th>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">Patient</th>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">Admission</th>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">Days</th>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">Fee/Mo</th>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">Next Month</th>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">Test</th>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">Canteen</th>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">Laundry</th>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">Barbar</th>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">Medicine</th>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">Other</th>
+            <th class="px-1 py-2 text-left text-[10px] uppercase tracking-tight">Received</th>
+            <th class="px-1 py-2 text-center text-[10px] uppercase tracking-tight">Action</th>
+          </tr>
+        </thead>
+        <tbody id="manual-discharge-patients-body" class="divide-y divide-gray-50"></tbody>
+      </table>
+    </div>
+
+    <div class="border-y border-emerald-100 bg-gray-50 px-4 py-3">
+      <h3 class="text-sm font-bold uppercase tracking-wide text-gray-800">Saved Manual Receipts</h3>
+    </div>
+    <div class="table-scroll-shell overflow-x-auto" style="--table-scroll-max-height: 18rem;">
+      <table class="min-w-full divide-y divide-gray-100 text-sm">
+        <thead class="bg-[#0b7454] text-white">
+          <tr>
+            <th class="px-3 py-3 text-left text-[10px] uppercase tracking-wide">#</th>
+            <th class="px-3 py-3 text-left text-[10px] uppercase tracking-wide">Patient</th>
+            <th class="px-3 py-3 text-left text-[10px] uppercase tracking-wide">Admission</th>
+            <th class="px-3 py-3 text-left text-[10px] uppercase tracking-wide">Discharge</th>
+            <th class="px-3 py-3 text-right text-[10px] uppercase tracking-wide">Gross</th>
+            <th class="px-3 py-3 text-right text-[10px] uppercase tracking-wide">Received</th>
+            <th class="px-3 py-3 text-right text-[10px] uppercase tracking-wide">Balance</th>
+            <th class="px-3 py-3 text-center text-[10px] uppercase tracking-wide">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="manual-discharge-table-body" class="divide-y divide-gray-50"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<div id="manual-discharge-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900 bg-opacity-50">
+  <div class="mx-4 max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl">
+    <div class="mb-4 flex items-center justify-between">
+      <h3 class="text-xl font-bold text-emerald-900">
+        <i class="fas fa-file-medical mr-2"></i>Manual Discharge Receipt
+      </h3>
+      <button onclick="closeManualDischargeModal()" class="text-gray-400 hover:text-gray-600">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
+
+    <form onsubmit="saveManualDischargeReceipt(event)">
+      <input type="hidden" id="mdr-id" />
+      <input type="hidden" id="mdr-patient-id" />
+
+      <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div class="md:col-span-2">
+          <label class="text-xs font-bold uppercase text-gray-600">Patient (optional)</label>
+          <select id="mdr-patient-select" class="w-full rounded border p-2 text-sm" onchange="document.getElementById('mdr-patient-id').value=this.value">
+            <option value="">Select patient...</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button type="button" onclick="loadManualDischargeFromSelectedPatient()" class="w-full rounded border bg-gray-100 p-2 text-sm font-bold text-gray-700 hover:bg-gray-200">
+            Load Patient Data
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Patient Name</label>
+          <input id="mdr-name" class="w-full rounded border p-2 text-sm" required />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Father/Guardian</label>
+          <input id="mdr-father" class="w-full rounded border p-2 text-sm" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Age</label>
+          <input id="mdr-age" type="number" class="w-full rounded border p-2 text-sm" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">CNIC</label>
+          <input id="mdr-cnic" class="w-full rounded border p-2 text-sm" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Contact</label>
+          <input id="mdr-contact" class="w-full rounded border p-2 text-sm" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Admission Date</label>
+          <input id="mdr-admission-date" type="date" class="w-full rounded border p-2 text-sm" onchange="syncManualStayFromDates()" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Discharge Date</label>
+          <input id="mdr-discharge-date" type="date" class="w-full rounded border p-2 text-sm" onchange="syncManualStayFromDates()" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Stay Days</label>
+          <input id="mdr-stay-days" type="number" min="1" value="1" class="w-full rounded border p-2 text-sm" oninput="calcManualDischargeTotals()" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Monthly Fee</label>
+          <input id="mdr-monthly-fee" type="number" value="0" class="w-full rounded border p-2 text-sm" oninput="calcManualDischargeTotals()" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Rehab Amount</label>
+          <input id="mdr-fee-amount" type="number" value="0" class="w-full rounded border bg-gray-50 p-2 text-sm" readonly />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Next Month</label>
+          <input id="mdr-rehab-next" type="number" value="0" class="w-full rounded border p-2 text-sm" oninput="calcManualDischargeTotals()" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Test</label>
+          <input id="mdr-test" type="number" value="0" class="w-full rounded border p-2 text-sm" oninput="calcManualDischargeTotals()" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Laundry</label>
+          <input id="mdr-laundry" type="number" value="0" class="w-full rounded border p-2 text-sm" oninput="calcManualDischargeTotals()" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Barbar</label>
+          <input id="mdr-barbar" type="number" value="0" class="w-full rounded border p-2 text-sm" oninput="calcManualDischargeTotals()" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Canteen</label>
+          <input id="mdr-canteen" type="number" value="0" class="w-full rounded border p-2 text-sm" oninput="calcManualDischargeTotals()" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Medicine</label>
+          <input id="mdr-medicine" type="number" value="0" class="w-full rounded border p-2 text-sm" oninput="calcManualDischargeTotals()" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Other/Old Charges</label>
+          <input id="mdr-other" type="number" value="0" class="w-full rounded border p-2 text-sm" oninput="calcManualDischargeTotals()" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Gross Total</label>
+          <input id="mdr-gross" type="number" value="0" class="w-full rounded border bg-gray-50 p-2 text-sm" readonly />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Received</label>
+          <input id="mdr-received" type="number" value="0" class="w-full rounded border p-2 text-sm" oninput="calcManualDischargeTotals()" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase text-gray-600">Net Balance</label>
+          <input id="mdr-balance" type="number" value="0" class="w-full rounded border bg-gray-50 p-2 text-sm" readonly />
+        </div>
+        <div class="md:col-span-2">
+          <label class="text-xs font-bold uppercase text-gray-600">Area</label>
+          <input id="mdr-area" class="w-full rounded border p-2 text-sm" />
+        </div>
+        <div class="md:col-span-2">
+          <label class="text-xs font-bold uppercase text-gray-600">Address</label>
+          <input id="mdr-address" class="w-full rounded border p-2 text-sm" />
+        </div>
+        <div class="md:col-span-4">
+          <label class="text-xs font-bold uppercase text-gray-600">Notes</label>
+          <textarea id="mdr-notes" class="w-full rounded border p-2 text-sm" rows="2"></textarea>
+        </div>
+      </div>
+
+      <div class="mt-5 flex justify-end gap-3">
+        <button type="button" onclick="closeManualDischargeModal()" class="rounded bg-gray-100 px-4 py-2 font-semibold text-gray-700">Cancel</button>
+        <button type="submit" class="rounded bg-emerald-700 px-5 py-2 font-bold text-white">Save Receipt</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="printable-manual-discharge" class="hidden">
+  <div id="manual-discharge-print-content"></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{{ url_for('static', filename='js/pages/manual_discharge.js') }}"></script>
+{% endblock %}
