@@ -1,0 +1,196 @@
+.patients-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.patients-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.patients-search-wrap {
+  position: relative;
+  flex: 1 1 300px;
+  min-width: min(100%, 300px);
+}
+
+.patients-search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #10b981;
+  pointer-events: none;
+}
+
+.patients-search-input {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  background: #f8fafc;
+  padding: 0.95rem 1rem 0.95rem 2.8rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.patients-search-input:focus {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+}
+
+.patients-kpi-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.patients-table-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.4rem 1.5rem 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  background: linear-gradient(180deg, rgba(250, 252, 251, 0.96), rgba(255, 255, 255, 0.94));
+}
+
+.patients-table-shell table {
+  min-width: 1180px;
+  font-size: 0.76rem;
+}
+
+.patient-directory-row {
+  transition: background-color 0.18s ease, opacity 0.18s ease;
+}
+
+.patient-directory-row:hover {
+  background: rgba(240, 253, 250, 0.75);
+}
+
+.patient-directory-row.is-discharged {
+  background: #f8fafc;
+}
+
+.patient-directory-row.is-discharged td:not(:last-child) {
+  opacity: 0.52;
+}
+
+.patient-id-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.patient-balance-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.48rem 0.7rem;
+  font-size: 0.67rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.patient-balance-pill.due {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.patient-balance-pill.refund {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #059669;
+}
+
+.patient-balance-pill.cleared {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+
+.patient-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.patient-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  border-radius: 999px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: white;
+  transition: transform 0.18s ease, background-color 0.18s ease;
+}
+
+.patient-action-btn:hover {
+  transform: translateY(-1px);
+}
+
+.patient-action-btn.bill {
+  background: #25d366;
+}
+
+.patient-action-btn.preview {
+  background: #2563eb;
+}
+
+.patient-action-btn.status {
+  background: #dc2626;
+}
+
+.patient-action-btn.restore {
+  background: #0f766e;
+}
+
+.patient-action-btn.legacy {
+  background: #0f172a;
+}
+
+@media (min-width: 1180px) {
+  .patients-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 767px) {
+  .patients-toolbar {
+    align-items: stretch;
+  }
+
+  .patients-search-wrap,
+  .patients-toolbar .app-secondary-btn,
+  .patients-toolbar .app-primary-btn {
+    width: 100%;
+  }
+}
+

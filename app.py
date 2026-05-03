@@ -21,6 +21,8 @@ import jwt
 import redis
 from rq import Queue
 load_dotenv()
+from routes.patients_page import register_patient_page_routes
+from routes.pages import register_page_routes
 from services.encryption import encrypt_data, decrypt_data
 
 app = Flask(__name__)
@@ -313,11 +315,6 @@ def calculate_prorated_fee(monthly_fee, days_elapsed):
 #    - All financial fields stored as strings with commas, parsed as integers
 # ============================================================
 
-@app.route('/')
-def index():
-    # Frontend handles redirection to login if session is missing.
-    return render_template('index.html')
-
 @app.route('/api/auth/login', methods=['POST'])
 @limiter.limit("5 per minute")
 def login():
@@ -500,6 +497,9 @@ def check_session():
             "user_id": session.get('user_id')
         })
     return jsonify({"is_logged_in": False})
+
+page_context = register_page_routes(app, mongo, ObjectId)
+register_patient_page_routes(app, page_context)
 
 # --- USER MANAGEMENT (ADMIN ONLY) ---
 @app.route('/api/users', methods=['GET'])

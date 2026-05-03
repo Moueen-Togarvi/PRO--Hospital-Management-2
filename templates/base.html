@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ page_title or "PRO System" }} - PRO HMS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Manrope:wght@500;600;700;800&family=DM+Sans:wght@400;500;700;800&display=swap" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0f766e" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app-shell.css') }}" />
+  {% block extra_styles %}{% endblock %}
+  <script>
+    window.__APP__ = {{ (app_context or {}) | tojson }};
+  </script>
+</head>
+<body class="{{ body_class or 'min-h-screen bg-slate-50 text-slate-900' }}{% if app_shell %} app-shell-body{% endif %}">
+  {% if app_shell %}
+  <div class="app-shell-layout min-h-screen">
+    {% include "partials/sidebar.html" %}
+    <div class="app-shell-content min-w-0">
+      {% include "partials/topbar.html" %}
+      <main class="px-4 py-5 md:px-8 md:py-8">
+  {% else %}
+      <main>
+  {% endif %}
+        {% block content %}{% endblock %}
+      </main>
+  {% if app_shell %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div id="toast-root" class="pointer-events-none fixed inset-x-0 top-4 z-[100] flex justify-center px-4"></div>
+
+  <script src="{{ url_for('static', filename='js/shared/ui.js') }}"></script>
+  {% if app_shell %}
+  <script src="{{ url_for('static', filename='js/shared/layout.js') }}"></script>
+  {% endif %}
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

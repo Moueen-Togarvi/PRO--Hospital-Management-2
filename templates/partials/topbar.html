@@ -1,0 +1,25 @@
+<header class="sticky top-0 z-20 border-b border-emerald-100 bg-white/85 backdrop-blur-md">
+  <div class="flex items-center justify-between gap-4 px-4 py-4 md:px-8">
+    <div class="flex items-center gap-3">
+      <button id="sidebar-open-btn" class="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-emerald-700 shadow-sm transition hover:bg-emerald-100 md:hidden">
+        <i class="fas fa-bars"></i>
+      </button>
+      <div>
+        <p class="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-500">PRO HMS</p>
+        <h2 class="text-xl font-black tracking-tight text-emerald-950">{{ page_title }}</h2>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <div class="hidden rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-right shadow-sm sm:block">
+        <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500">{{ current_user.role }}</p>
+        <p class="max-w-[220px] truncate text-sm font-black text-emerald-900">{{ current_user.display_name }}</p>
+      </div>
+      <a href="/legacy" class="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-700 shadow-sm transition hover:bg-emerald-50">
+        <i class="fas fa-arrow-up-right-from-square"></i>
+        <span>Legacy</span>
+      </a>
+    </div>
+  </div>
+</header>
+
