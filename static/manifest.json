@@ -1,0 +1,39 @@
+{
+  "name": "PRO — Pakistan Recovery Oasis",
+  "short_name": "PRO",
+  "description": "Patient management and family dashboard for Pakistan Recovery Oasis",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a3c5e",
+  "theme_color": "#1a3c5e",
+  "lang": "en",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["medical", "health", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/?view=dashboard",
+      "description": "Open admin dashboard"
+    },
+    {
+      "name": "Patients",
+      "url": "/?view=patients",
+      "description": "View all patients"
+    }
+  ]
+}

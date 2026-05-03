@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, send_file, send_from_directory, session, redirect, url_for
 from flask_pymongo import PyMongo
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
@@ -8,18 +8,24 @@ from email.message import EmailMessage
 import smtplib
 import ssl
 import os
+import random
+import string
 import pandas as pd
 import io
-from dotenv import load_dotenv 
+from dotenv import load_dotenv
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_talisman import Talisman
 from flask_cors import CORS
+import jwt
+import redis
+from rq import Queue
 load_dotenv()
+from services.encryption import encrypt_data, decrypt_data
 
 app = Flask(__name__)
 CORS(app)
-Talisman(app, content_security_policy=None)  # CSP disabled for now to avoid breaking SPA scripts, can be hardened later
+Talisman(app, content_security_policy=None, force_https=False)  # Disabled force_https for local development
 limiter = Limiter(
     get_remote_address,
     app=app,
@@ -50,6 +56,7 @@ app.config["MONGO_URI"] = mongo_uri
 
 secret_key = os.environ.get("SECRET_KEY", "06e4b4738ab81f94277a7216b5e79fb24b339f28a6a131391d8d6f8f0a295dc1")
 app.config["SECRET_KEY"] = secret_key
+app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", secret_key)
 app.config["GMAIL_USER"] = os.environ.get("GMAIL_USER")
 app.config["GMAIL_APP_PASSWORD"] = os.environ.get("GMAIL_APP_PASSWORD")
 app.config["PASSWORD_RESET_EXPIRY_MINUTES"] = int(os.environ.get("PASSWORD_RESET_EXPIRY_MINUTES", "30"))
@@ -64,6 +71,10 @@ try:
 except Exception as e:
     print(f"CRITICAL: MongoDB initialization failed: {type(e).__name__} - {e}")
     mongo = None
+
+redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+redis_conn = redis.from_url(redis_url)
+task_queue = Queue(connection=redis_conn)
 
 serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 
@@ -126,6 +137,9 @@ def create_indices():
             mongo.db.expenses.create_index([("date", -1)])
             mongo.db.expenses.create_index([("category", 1)])
             
+            # Daily Reports indices
+            mongo.db.daily_reports.create_index([("patient_id", 1), ("date", -1)])
+            
             print("Database indices verified/created.")
         except Exception as e:
             print(f"Error creating indices: {e}")
@@ -134,6 +148,21 @@ def create_indices():
 with app.app_context():
     ensure_initial_admin()
     create_indices()
+
+# ── APScheduler (only in main process, not werkzeug reloader child) ───────────
+_scheduler = None
+if os.environ.get('SCHEDULER_ENABLED', 'true').lower() == 'true':
+    _is_reloader_child = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+    # In production (gunicorn) WERKZEUG_RUN_MAIN is not set — always start
+    # In dev (flask debug) only start in the child process that serves requests
+    if _is_reloader_child or not app.debug:
+        try:
+            from services.scheduler import create_scheduler
+            _scheduler = create_scheduler()
+            _scheduler.start()
+            print("[Scheduler] ✅ APScheduler started (billing: 1st/5th 09:00 | reports: 17:00 PKT)")
+        except Exception as _se:
+            print(f"[Scheduler] ⚠️  Could not start scheduler: {_se}")
 
 
 def normalize_email(value):
@@ -179,10 +208,27 @@ def send_password_reset_email(to_email, username, token):
 
 # --- AUTHENTICATION ROUTES ---
 
+def get_current_user_id():
+    """Helper to get user ID from JWT header or fallback to session."""
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        try:
+            payload = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+            return payload.get('user_id')
+        except jwt.ExpiredSignatureError:
+            return None # Requires refresh
+        except jwt.InvalidTokenError:
+            return None
+    # Fallback to session
+    return session.get('user_id')
+
 def login_required(f):
     def wrapper(*args, **kwargs):
-        if 'user_id' not in session:
+        user_id = get_current_user_id()
+        if not user_id:
             return jsonify({"error": "Unauthorized"}), 401
+        # Set user_id in kwargs or context if needed, for now we rely on get_current_user_id inside routes
         return f(*args, **kwargs)
     wrapper.__name__ = f.__name__
     return wrapper
@@ -192,10 +238,18 @@ def role_required(roles):
         @login_required
         def wrapper(*args, **kwargs):
             if not check_db(): return jsonify({"error": "Database not initialized"}), 500
-            user = mongo.db.users.find_one({"_id": ObjectId(session['user_id'])})
-            if user and user.get('role') in roles:
+            user_id = get_current_user_id()
+            user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+            
+            # Diagnostic print for debugging 403s
+            current_role = user.get('role') if user else 'None'
+            print(f"[RBAC Debug] User: {user.get('username') if user else 'Unknown'}, Role: {current_role}, Required: {roles}")
+            
+            # Exclude deleted users
+            if user and not user.get('deleted_at') and current_role in roles:
                 return f(*args, **kwargs)
-            return jsonify({"error": "Access Denied"}), 403
+            
+            return jsonify({"error": "Access Denied", "debug_role": current_role}), 403
         wrapper.__name__ = f.__name__
         return wrapper
     return decorator
@@ -269,20 +323,91 @@ def index():
 def login():
     if not check_db(): return jsonify({"error": "Database error"}), 500
     data = clean_input_data(request.json)
-    user = mongo.db.users.find_one({"username": data['username']})
+    user = mongo.db.users.find_one({"username": data['username'], "deleted_at": {"$exists": False}})
     
     if user and check_password_hash(user['password'], data['password']):
-        session['user_id'] = str(user['_id'])
+        user_id = str(user['_id'])
+        role = user['role']
+
+        # MFA Check for Privileged Roles
+        if role in ['Admin', 'Doctor', 'Psychologist'] and os.getenv('MFA_ENABLED', 'false').lower() == 'true':
+            # Store temporary session for MFA
+            session['mfa_user_id'] = user_id
+            session['mfa_pending'] = True
+            
+            # Automatically trigger OTP send if phone exists
+            phone = str(user.get('phone') or user.get('contactNo') or '').strip()
+            if phone:
+                otp = ''.join(random.choices(string.digits, k=6))
+                expires_at = datetime.now() + timedelta(minutes=5)
+                _otp_store[user_id] = {'otp': otp, 'expires_at': expires_at}
+                task_queue.enqueue('services.whatsapp.send_otp',
+                                   phone_number=phone, otp_code=otp, username=user.get('username', ''))
+            
+            return jsonify({
+                "mfa_required": True,
+                "user_id": user_id,
+                "message": "MFA code sent to your registered WhatsApp"
+            }), 200
+
+        # Regular Login Flow for Family or if MFA is disabled
+        session['user_id'] = user_id
         session['username'] = user['username']
         session['role'] = user['role']
-        return jsonify({
+        
+        # JWT Token Generation
+        access_token = jwt.encode({
+            'user_id': user_id,
+            'role': user['role'],
+            'exp': datetime.utcnow() + timedelta(minutes=15)
+        }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+        
+        refresh_token = jwt.encode({
+            'user_id': user_id,
+            'exp': datetime.utcnow() + timedelta(days=7)
+        }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+        
+        response = jsonify({
             "message": "Login successful",
             "username": user['username'],
             "role": user['role'],
             "name": user.get('name', user['username']),
-            "user_id": str(user['_id'])
+            "user_id": user_id,
+            "access_token": access_token
         })
+        
+        # Secure HttpOnly Refresh Token
+        response.set_cookie('refresh_token', refresh_token, httponly=True, secure=True, samesite='Strict')
+        return response
+        
     return jsonify({"error": "Invalid credentials"}), 401
+
+@app.route('/api/auth/refresh', methods=['POST'])
+def refresh_token():
+    """Endpoint to refresh access token using the HttpOnly refresh cookie."""
+    refresh_token = request.cookies.get('refresh_token')
+    if not refresh_token:
+        return jsonify({"error": "No refresh token provided"}), 401
+        
+    try:
+        payload = jwt.decode(refresh_token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+        user_id = payload.get('user_id')
+        
+        user = mongo.db.users.find_one({"_id": ObjectId(user_id), "deleted_at": {"$exists": False}})
+        if not user:
+            return jsonify({"error": "User not found"}), 401
+            
+        new_access_token = jwt.encode({
+            'user_id': user_id,
+            'role': user['role'],
+            'exp': datetime.utcnow() + timedelta(minutes=15)
+        }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+        
+        return jsonify({"access_token": new_access_token})
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "Refresh token expired"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Invalid refresh token"}), 401
 
 
 @app.route('/api/auth/forgot', methods=['POST'])
@@ -381,7 +506,7 @@ def check_session():
 @role_required(['Admin'])
 def get_users():
     if not check_db(): return jsonify([])
-    users_cursor = mongo.db.users.find({}, {'password': 0})
+    users_cursor = mongo.db.users.find({"deleted_at": {"$exists": False}}, {'password': 0})
     users = [{**u, '_id': str(u['_id'])} for u in users_cursor]
     return jsonify(users)
 
@@ -405,6 +530,25 @@ def create_user():
 
     data['password'] = generate_password_hash(data['password'])
     data['created_at'] = datetime.now()
+    
+    # Handle Family mapping
+    if data.get('role') == 'Family':
+        patient_ids_raw = data.get('patient_ids', [])
+        patient_ids = []
+        for pid in patient_ids_raw:
+            try:
+                # Verify patient exists
+                if mongo.db.patients.find_one({"_id": ObjectId(pid)}):
+                    patient_ids.append(ObjectId(pid))
+            except:
+                pass
+        data['patient_ids'] = patient_ids
+
+    # Handle Shift mapping
+    if data.get('role') == 'General Staff':
+        data['day_shift'] = data.get('day_shift', False)
+        data['night_shift'] = data.get('night_shift', False)
+    
     try:
         result = mongo.db.users.insert_one(data)
         return jsonify({"message": "User created", "id": str(result.inserted_id)}), 201
@@ -420,7 +564,7 @@ def delete_user(id):
         if user and user.get('username') == 'ImranSaab':
             return jsonify({"error": "Main admin cannot be deleted"}), 403
             
-        mongo.db.users.delete_one({'_id': ObjectId(id)})
+        mongo.db.users.update_one({'_id': ObjectId(id)}, {'$set': {'deleted_at': datetime.utcnow()}})
         return jsonify({"message": "User deleted"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -434,6 +578,45 @@ def delete_user(id):
 #         return jsonify({"message": "Patient deleted"})
 #     except Exception as e:
 #         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/users/<id>/patients', methods=['PUT'])
+@role_required(['Admin'])
+def update_user_patients(id):
+    """Link patients to a user (primarily for Family role)."""
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        data = request.json or {}
+        patient_ids = data.get('patient_ids', [])
+        from bson.objectid import ObjectId
+        obj_ids = [ObjectId(pid) for pid in patient_ids if pid]
+        
+        mongo.db.users.update_one(
+            {'_id': ObjectId(id)},
+            {'$set': {'patient_ids': obj_ids}}
+        )
+        return jsonify({'message': 'User patient links updated successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/users/<id>/shift', methods=['PUT'])
+@role_required(['Admin'])
+def update_user_shift(id):
+    """Toggle shift assignment for General Staff."""
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        data = request.json or {}
+        update_fields = {}
+        if 'day_shift' in data: update_fields['day_shift'] = bool(data['day_shift'])
+        if 'night_shift' in data: update_fields['night_shift'] = bool(data['night_shift'])
+        
+        if update_fields:
+            mongo.db.users.update_one({'_id': ObjectId(id)}, {'$set': update_fields})
+        
+        return jsonify({'message': 'Shift updated successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/users/change_password', methods=['POST'])
@@ -596,13 +779,13 @@ def debug_dashboard():
             try:
                 fee = int(p.get('monthlyFee', '0').replace(',', ''))
                 patient_data.append({
-                    'name': p.get('name'),
+                    'name': decrypt_data(p.get('name')),
                     'monthlyFee_raw': p.get('monthlyFee'),
                     'monthlyFee_parsed': fee
                 })
             except ValueError:
                 patient_data.append({
-                    'name': p.get('name'),
+                    'name': decrypt_data(p.get('name')),
                     'monthlyFee_raw': p.get('monthlyFee'),
                     'monthlyFee_parsed': 'ERROR'
                 })
@@ -651,7 +834,7 @@ def get_month_admissions():
         for p in cursor:
             admissions.append({
                 'id': str(p.get('_id')),
-                'name': p.get('name', ''),
+                'name': decrypt_data(p.get('name', '')),
                 'admissionDate': p.get('admissionDate', ''),
                 'created_at': p.get('created_at').isoformat() if p.get('created_at') else ''
             })
@@ -667,11 +850,12 @@ def get_month_admissions():
 def get_patients():
     if not check_db(): return jsonify([])
     try:
-        patients_cursor = mongo.db.patients.find()
+        patients_cursor = mongo.db.patients.find({"deleted_at": {"$exists": False}})
         
         # Aggregate total canteen spending for all patients
         canteen_totals_agg = list(mongo.db.canteen_sales.aggregate([
             {'$match': {
+                'deleted_at': {'$exists': False},
                 '$or': [
                     {'entry_type': {'$exists': False}},
                     {'entry_type': {'$ne': 'other'}}
@@ -685,6 +869,17 @@ def get_patients():
         for p in patients_cursor:
             patient_id = str(p['_id'])
             p['_id'] = patient_id
+            
+            # Decrypt sensitive fields
+            raw_name = p.get('name', '')
+            p['name'] = decrypt_data(raw_name)
+            print(f"[Patient Debug] Raw: {raw_name[:10]}... -> Decrypted: {p['name']}")
+            
+            p['contactNo'] = decrypt_data(p.get('contactNo', ''))
+            p['cnic'] = decrypt_data(p.get('cnic', ''))
+            p['guardianPhone'] = decrypt_data(p.get('guardianPhone', ''))
+            p['guardianName'] = decrypt_data(p.get('guardianName', ''))
+            
             # Ensure monthlyFee is present for canteen view logic
             p['monthlyFee'] = p.get('monthlyFee', '0')
             p['photo1'] = p.get('photo1', '')
@@ -708,6 +903,18 @@ def add_patient():
     if not check_db(): return jsonify({"error": "Database error"}), 500
     try:
         data = clean_input_data(request.json)
+        
+        # Encrypt sensitive fields before storage
+        original_name = data.get('name', 'Unknown')
+        guardian_phone = data.get('guardianPhone') or data.get('contactNo') or ''
+        guardian_name = data.get('guardianName', '')
+        
+        data['name'] = encrypt_data(original_name)
+        if 'contactNo' in data: data['contactNo'] = encrypt_data(data['contactNo'])
+        if 'cnic' in data: data['cnic'] = encrypt_data(data['cnic'])
+        if 'guardianPhone' in data: data['guardianPhone'] = encrypt_data(data['guardianPhone'])
+        if 'guardianName' in data: data['guardianName'] = encrypt_data(data['guardianName'])
+        
         data['created_at'] = datetime.now()
         data['notes'] = [] # General Notes (Legacy)
         data['monthlyFee'] = data.get('monthlyFee', '0')
@@ -730,6 +937,34 @@ def add_patient():
         result = mongo.db.patients.insert_one(data)
         patient_id = str(result.inserted_id)
 
+        # ─── AUTO-CREATE FAMILY ACCOUNT ───
+        if guardian_phone:
+            # Generate random temporary password
+            temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+            username = f"family_{original_name.lower().replace(' ', '_')[:10]}_{patient_id[-4:]}"
+            
+            family_user = {
+                'username': username,
+                'password': generate_password_hash(temp_password),
+                'role': 'Family',
+                'name': guardian_name or f"{original_name}'s Family",
+                'phone': str(guardian_phone).strip(),
+                'patient_ids': [ObjectId(patient_id)],
+                'created_at': datetime.now(),
+                'temp_password_active': True
+            }
+            mongo.db.users.insert_one(family_user)
+            
+            # Queue Welcome Message via WhatsApp
+            login_url = request.host_url # Base URL of the app
+            task_queue.enqueue('services.whatsapp.send_welcome_message',
+                               phone_number=str(guardian_phone).strip(),
+                               family_name=family_user['name'],
+                               patient_name=original_name,
+                               login_url=login_url,
+                               username=username,
+                               temp_password=temp_password)
+
         # Auto-log initial payment as an expense
         try:
             initial_received = int(str(data.get('receivedAmount', '0')).replace(',', ''))
@@ -738,7 +973,7 @@ def add_patient():
                     'type': 'incoming',
                     'amount': initial_received,
                     'category': 'Patient Fee',
-                    'note': f"Initial Advance from {data.get('name')} (Admission)",
+                    'note': f"Initial Advance from {original_name} (Admission)",
                     'payment_method': 'Cash/Initial',
                     'patient_id': patient_id,
                     'date': datetime.now(),
@@ -772,11 +1007,11 @@ def update_patient(id):
 def delete_patient(id):
     if not check_db(): return jsonify({"error": "Database error"}), 500
     try:
-        # Delete the patient
-        result = mongo.db.patients.delete_one({'_id': ObjectId(id)})
-        if result.deleted_count > 0:
-            # Also delete associated records (session notes and medical records)
-            mongo.db.patient_records.delete_many({'patient_id': id})
+        # Soft delete the patient
+        result = mongo.db.patients.update_one({'_id': ObjectId(id)}, {'$set': {'deleted_at': datetime.utcnow()}})
+        if result.modified_count > 0:
+            # Also soft delete associated records (session notes and medical records)
+            mongo.db.patient_records.update_many({'patient_id': id}, {'$set': {'deleted_at': datetime.utcnow()}})
             return jsonify({"message": "Patient deleted successfully"}), 200
         else:
             return jsonify({"error": "Patient not found"}), 404
@@ -901,7 +1136,7 @@ def get_canteen_breakdown():
         
         patients_map = {
             str(p['_id']): {
-                'name': p['name'], 
+                'name': decrypt_data(p.get('name', '')), 
                 'allowance': p.get('monthlyAllowance', '0'), 
                 'sales': 0,
                 'isDischarged': p.get('isDischarged', False)
@@ -996,7 +1231,7 @@ def get_daily_canteen_sheet():
             
             sheet.append({
                 'id': p_id,
-                'name': p['name'],
+                'name': decrypt_data(p.get('name', '')),
                 'dailyAllowance': p.get('monthlyAllowance', '0'),
                 'todayItems': sales_data['items'],
                 'todayTotal': sales_data['total']
@@ -1034,7 +1269,7 @@ def get_canteen_sales_history():
             sales_list.append({
                 'id': str(sale['_id']),
                 'patient_id': str(sale['patient_id']),
-                'patient_name': patient['name'] if patient else 'Unknown',
+                'patient_name': decrypt_data(patient.get('name', '')) if patient else 'Unknown',
                 'item': sale.get('item', ''),
                 'amount': sale.get('amount', 0),
                 'date': sale['date'].isoformat() if sale.get('date') else '',
@@ -1164,7 +1399,7 @@ def get_canteen_monthly_table():
         for patient in patients_list:
             patient_id = patient['_id']
             patient_id_str = str(patient_id)
-            patient_name = patient.get('name', 'Unknown')
+            patient_name = decrypt_data(patient.get('name', 'Unknown'))
             monthly_allowance = _safe_int(patient.get('monthlyAllowance', 0))
             is_discharged = patient.get('isDischarged', False)
             
@@ -1462,9 +1697,10 @@ def delete_expense(id):
     if not check_db():
         return jsonify({"error": "Database error"}), 500
     try:
-        result = mongo.db.expenses.delete_one({'_id': ObjectId(id)})
-        if result.deleted_count:
-            return jsonify({"message": "Expense deleted"})
+        # result = mongo.db.expenses.delete_one({'_id': ObjectId(id)})
+        result = mongo.db.expenses.update_one({'_id': ObjectId(id)}, {'$set': {'deleted_at': datetime.now()}})
+        if result.modified_count:
+            return jsonify({"message": "Expense soft-deleted"})
         return jsonify({"error": "Expense not found"}), 404
     except Exception as e:
         print(f"Delete expense error: {e}")
@@ -1533,16 +1769,16 @@ def export_patients():
             patient_id = str(p.get('_id', '')) if '_id' in p else ''
             
             row = {
-                'name': p.get('name', ''),
+                'name': decrypt_data(p.get('name', '')),
                 'fatherName': p.get('fatherName', ''),
                 'admissionDate': p.get('admissionDate', ''),
                 'idNo': p.get('idNo', '') if is_admin else '',
                 'age': p.get('age', ''),
-                'cnic': p.get('cnic', '') if is_admin else '',
-                'contactNo': p.get('contactNo', '') if is_admin else '',
+                'cnic': decrypt_data(p.get('cnic', '')) if is_admin else '',
+                'contactNo': decrypt_data(p.get('contactNo', '')) if is_admin else '',
                 'address': p.get('address', '') if is_admin else '',
                 'complaint': p.get('complaint', ''),
-                'guardianName': p.get('guardianName', '') if is_admin else '',
+                'guardianName': decrypt_data(p.get('guardianName', '')) if is_admin else '',
                 'relation': p.get('relation', '') if is_admin else '',
                 'drugProblem': p.get('drugProblem', ''),
                 'maritalStatus': p.get('maritalStatus', ''),
@@ -1645,7 +1881,7 @@ def get_accounts_summary():
             
             summary.append({
                 'id': pid,
-                'name': p.get('name', ''),
+                'name': decrypt_data(p.get('name', '')),
                 'fatherName': p.get('fatherName', ''),
                 'age': p.get('age', ''),
                 'area': p.get('address', ''), 
@@ -1869,9 +2105,9 @@ def pay_utility_bill(id):
                 'created_at': datetime.now()
             })
             
-        # Remove from bills collection
-        mongo.db.utility_bills.delete_one({'_id': ObjectId(id)})
-        return jsonify({"message": "Bill paid and removed"})
+        # Remove from bills collection (SOFT DELETE)
+        mongo.db.utility_bills.update_one({'_id': ObjectId(id)}, {'$set': {'deleted_at': datetime.now(), 'status': 'Paid'}})
+        return jsonify({"message": "Bill marked as paid and soft-deleted"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1885,8 +2121,8 @@ def get_employees():
         month = request.args.get('month', type=int)
         year = request.args.get('year', type=int)
 
-        # Sort by name alphabetically
-        cursor = mongo.db.employees.find().sort('name', 1)
+        # Sort by name alphabetically, filtering out deleted
+        cursor = mongo.db.employees.find({"deleted_at": {"$exists": False}}).sort('name', 1)
         employees = []
         for e in cursor:
             advance_value = e.get('advance', '')
@@ -1965,8 +2201,9 @@ def update_employee(id):
 def delete_employee(id):
     if not check_db(): return jsonify({"error": "Database error"}), 500
     try:
-        mongo.db.employees.delete_one({'_id': ObjectId(id)})
-        return jsonify({"message": "Employee deleted"})
+        # mongo.db.employees.delete_one({'_id': ObjectId(id)})
+        mongo.db.employees.update_one({'_id': ObjectId(id)}, {'$set': {'deleted_at': datetime.now()}})
+        return jsonify({"message": "Employee soft-deleted"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -2040,7 +2277,7 @@ def get_payment_records():
                 if oid:
                     valid_ids.append(oid)
             patients = list(mongo.db.patients.find({'_id': {'$in': valid_ids}}, {'name': 1}))
-            patient_map = {str(pat['_id']): pat.get('name', 'Unknown') for pat in patients}
+            patient_map = {str(pat['_id']): decrypt_data(pat.get('name', 'Unknown')) for pat in patients}
 
         # Process and format the records
         records = []
@@ -2666,7 +2903,7 @@ def export_payment_records():
                 if oid:
                     valid_ids.append(oid)
             patients = list(mongo.db.patients.find({'_id': {'$in': valid_ids}}, {'name': 1}))
-            patient_map = {str(pat['_id']): pat.get('name', 'Unknown') for pat in patients}
+            patient_map = {str(pat['_id']): decrypt_data(pat.get('name', 'Unknown')) for pat in patients}
 
         for p in payments:
             # Prefer patient_id lookup, then fallback to note parsing
@@ -2941,7 +3178,7 @@ def generate_discharge_bill(id):
 # --- DAILY REPORT APIS ---
 
 @app.route('/api/reports', methods=['GET'])
-@role_required(['Admin', 'General Staff', 'Doctor'])
+@role_required(['Admin', 'Staff', 'Doctor'])
 def get_daily_report():
     if not check_db(): return jsonify({"error": "Database error"}), 500
     
@@ -2964,7 +3201,7 @@ def get_daily_report():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/reports/update', methods=['POST'])
-@role_required(['Admin', 'General Staff', 'Doctor'])
+@role_required(['Admin', 'Staff', 'Doctor'])
 def update_daily_report():
     if not check_db(): return jsonify({"error": "Database error"}), 500
     
@@ -3083,7 +3320,7 @@ def list_psych_sessions():
         if patient_ids:
             patients = mongo.db.patients.find({"_id": {"$in": [ObjectId(pid) for pid in patient_ids if ObjectId.is_valid(pid)]}})
             for p in patients:
-                patient_map[str(p['_id'])] = p.get('name', 'Unknown')
+                patient_map[str(p['_id'])] = decrypt_data(p.get('name', 'Unknown'))
 
         psych_map = {}
         if psych_ids:
@@ -3651,6 +3888,170 @@ def delete_manual_discharge_receipt(id):
         print(f"Manual receipt delete error: {e}")
         return jsonify({"error": str(e)}), 500
 
+# --- PHASE 2: DAILY REPORTS & FAMILY DASHBOARD ---
+
+@app.route('/api/daily_reports', methods=['POST'])
+@role_required(['Admin', 'Doctor', 'Psychologist'])
+def create_daily_report():
+    if not check_db(): return jsonify({"error": "Database error"}), 500
+    try:
+        data = clean_input_data(request.json)
+        required_fields = ['patient_id', 'vitals', 'mood', 'diet_status']
+        if not all(k in data for k in required_fields):
+            return jsonify({"error": "Missing required fields"}), 400
+            
+        report = {
+            'patient_id': data['patient_id'],
+            'date': datetime.now(),
+            'vitals': data['vitals'],
+            'mood': data['mood'],
+            'diet_status': data['diet_status'],
+            'notes': data.get('notes', ''),
+            'created_by': session.get('username', get_current_user_id())
+        }
+        
+        result = mongo.db.daily_reports.insert_one(report)
+        return jsonify({"message": "Daily report submitted", "id": str(result.inserted_id)}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/daily_reports/<patient_id>', methods=['GET'])
+@login_required
+def get_daily_reports(patient_id):
+    if not check_db(): return jsonify({"error": "Database error"}), 500
+    try:
+        # If user is Family, ensure they have access to this patient
+        user_id = get_current_user_id()
+        user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+        if user and user.get('role') == 'Family':
+            patient_ids = [str(pid) for pid in user.get('patient_ids', [])]
+            if str(patient_id) not in patient_ids:
+                return jsonify({"error": "Unauthorized access to patient data"}), 403
+
+        reports_cursor = mongo.db.daily_reports.find({"patient_id": str(patient_id)}).sort("date", -1)
+        reports = [{**r, '_id': str(r['_id']), 'date': str(r['date'])} for r in reports_cursor]
+        return jsonify(reports), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/family/dashboard', methods=['GET'])
+@role_required(['Family'])
+def family_dashboard():
+    """Enhanced dashboard for family members."""
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        user_id = get_current_user_id()
+        user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+        
+        # Get linked patients
+        patient_ids = user.get('patient_ids', [])
+        patients = list(mongo.db.patients.find({'_id': {'$in': patient_ids}, 'deleted_at': {'$exists': False}}))
+        
+        results = []
+        for p in patients:
+            p_id = str(p['_id'])
+            # Decrypt patient name for family
+            p['name'] = decrypt_data(p.get('name', ''))
+            
+            # 1. Latest Daily Report
+            latest_report = mongo.db.daily_reports.find_one(
+                {'patient_id': p_id},
+                sort=[('date', -1)]
+            )
+            if latest_report:
+                latest_report['_id'] = str(latest_report['_id'])
+                latest_report['date'] = str(latest_report['date'])
+            
+            # 2. Last 7 Daily Reports (for Mood Chart)
+            recent_reports = list(mongo.db.daily_reports.find(
+                {'patient_id': p_id},
+                sort=[('date', -1)]
+            ).limit(7))
+            mood_chart = []
+            for r in reversed(recent_reports):
+                mood_chart.append({
+                    'date': r.get('date').strftime('%m/%d') if r.get('date') else '',
+                    'mood': r.get('behavior', 'Neutral')
+                })
+                
+            # 3. Latest Psychologist Session Notes
+            notes = list(mongo.db.patient_records.find(
+                {'patient_id': ObjectId(p_id), 'type': 'session_note', 'deleted_at': {'$exists': False}},
+                sort=[('date', -1)]
+            ).limit(3))
+            for n in notes:
+                n['_id'] = str(n['_id'])
+                n['patient_id'] = str(n['patient_id'])
+
+            # 4. Upcoming Meetings
+            meetings = list(mongo.db.meetings.find({
+                'patient_id': p_id,
+                'status': {'$in': ['accepted', 'pending', 'rescheduled']},
+                'deleted_at': {'$exists': False}
+            }).sort('requested_date', 1).limit(5))
+            for m in meetings:
+                m['_id'] = str(m['_id'])
+            
+            # 5. Financial Summary
+            financial_summary = {}
+            try:
+                admission_date = p.get('admissionDate')
+                days_elapsed = 0
+                if admission_date:
+                    if isinstance(admission_date, str):
+                        adm_dt = datetime.fromisoformat(admission_date.replace('Z', '+00:00'))
+                    else:
+                        adm_dt = admission_date
+                    days_elapsed = max(0, (datetime.now() - adm_dt.replace(tzinfo=None)).days)
+
+                monthly_fee_raw = int(str(p.get('monthlyFee', '0')).replace(',', '') or '0')
+                prorated_fee = int((monthly_fee_raw / 30.0) * max(days_elapsed, 1))
+
+                canteen_agg = list(mongo.db.canteen_sales.aggregate([
+                    {'$match': {'patient_id': ObjectId(p_id)}},
+                    {'$group': {'_id': None, 'total': {'$sum': '$amount'}}}
+                ]))
+                canteen_total = canteen_agg[0]['total'] if canteen_agg else 0
+                laundry = int(p.get('laundryAmount', 0) or 0) if p.get('laundryStatus') else 0
+                received = int(str(p.get('receivedAmount', '0')).replace(',', '') or '0')
+                total_charges = prorated_fee + canteen_total + laundry
+                balance_due = total_charges - received
+
+                financial_summary = {
+                    'days_elapsed': days_elapsed,
+                    'monthly_fee': monthly_fee_raw,
+                    'prorated_fee': prorated_fee,
+                    'canteen_total': canteen_total,
+                    'laundry_amount': laundry,
+                    'total_charges': total_charges,
+                    'received_amount': received,
+                    'balance_due': balance_due,
+                }
+            except Exception as fe:
+                print(f"Family financial calc error: {fe}")
+
+            results.append({
+                'patient': {
+                    '_id': p_id,
+                    'name': p['name'],
+                    'admissionDate': p.get('admissionDate'),
+                    'isDischarged': p.get('isDischarged', False)
+                },
+                'latest_report': latest_report,
+                'mood_chart': mood_chart,
+                'session_notes': notes,
+                'upcoming_meetings': meetings,
+                'financial_summary': financial_summary,
+                'bill_preview_url': f"/api/patients/{p_id}/bill/preview"
+            })
+            
+        return jsonify(results)
+    except Exception as e:
+        print(f"Family Dashboard Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+
 # --- HEALTH CHECK ENDPOINT (for cron-job.org) ---
 
 @app.route('/health', methods=['GET'])
@@ -3680,6 +4081,554 @@ def ping():
     """Ultra-minimal ping endpoint - even lighter than /health"""
     return '', 200
     
+
+# =============================================================
+#  AUDIT LOG MIDDLEWARE
+# =============================================================
+
+@app.after_request
+def log_audit_trail(response):
+    """Log every mutating API request to the audit_logs collection."""
+    if request.method in ('POST', 'PUT', 'DELETE', 'PATCH') and request.path.startswith('/api/'):
+        if check_db():
+            try:
+                user_id = get_current_user_id()
+                mongo.db.audit_logs.insert_one({
+                    'user_id': user_id,
+                    'method': request.method,
+                    'endpoint': request.endpoint,
+                    'path': request.path,
+                    'status_code': response.status_code,
+                    'ip': request.remote_addr,
+                    'timestamp': datetime.utcnow()
+                })
+            except Exception:
+                pass  # Never let audit logging break the response
+    return response
+
+
+# =============================================================
+#  STATIC / PWA ROUTES
+# =============================================================
+
+@app.route('/manifest.json')
+def pwa_manifest():
+    """Serve PWA web app manifest."""
+    return send_from_directory('static', 'manifest.json', mimetype='application/manifest+json')
+
+
+@app.route('/sw.js')
+def service_worker():
+    """Serve service worker from root scope (required by browsers)."""
+    response = send_from_directory('static', 'sw.js', mimetype='application/javascript')
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache'
+    return response
+
+
+@app.route('/api/pdfs/<filename>')
+@login_required
+def serve_pdf(filename):
+    """Serve locally stored billing PDFs (requires login)."""
+    from services.pdf_storage import get_local_pdf_path
+    path = get_local_pdf_path(filename)
+    if not path:
+        return jsonify({'error': 'PDF not found'}), 404
+    return send_file(path, mimetype='application/pdf', as_attachment=False)
+
+
+# =============================================================
+#  WHATSAPP AUTOMATION ROUTES
+# =============================================================
+
+@app.route('/api/whatsapp/logs', methods=['GET'])
+@role_required(['Admin'])
+def get_whatsapp_logs():
+    """View WhatsApp message log."""
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        limit = int(request.args.get('limit', 50))
+        msg_type = request.args.get('type')  # optional filter
+        query = {}
+        if msg_type:
+            query['message_type'] = msg_type
+        logs = list(mongo.db.whatsapp_logs.find(query).sort('sent_at', -1).limit(limit))
+        for log in logs:
+            log['_id'] = str(log['_id'])
+            log['sent_at'] = log['sent_at'].isoformat() if log.get('sent_at') else ''
+        return jsonify(logs)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/whatsapp/trigger-billing', methods=['POST'])
+@role_required(['Admin'])
+def trigger_billing_manually():
+    """Manually trigger billing dispatch for one or all patients."""
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        data = request.json or {}
+        patient_id = data.get('patient_id')  # Optional: target specific patient
+        now = datetime.now()
+        month_year = now.strftime('%B %Y')
+
+        if patient_id:
+            patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)})
+            if not patient:
+                return jsonify({'error': 'Patient not found'}), 404
+            phone = str(patient.get('contactNo') or patient.get('guardianPhone') or '').strip()
+            if not phone:
+                return jsonify({'error': 'No phone number for patient'}), 400
+            task_queue.enqueue('worker.task_send_billing',
+                               patient_id=patient_id, phone_number=phone, month_year=month_year)
+            return jsonify({'message': f'Billing queued for {patient.get("name")}', 'queued': 1})
+        else:
+            patients = list(mongo.db.patients.find({'isDischarged': {'$ne': True}, 'deleted_at': {'$exists': False}}))
+            queued = 0
+            for p in patients:
+                phone = str(p.get('contactNo') or p.get('guardianPhone') or '').strip()
+                if phone:
+                    task_queue.enqueue('worker.task_send_billing',
+                                       patient_id=str(p['_id']), phone_number=phone, month_year=month_year)
+                    queued += 1
+            return jsonify({'message': f'Billing queued for {queued} patients', 'queued': queued})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/patients/<id>/bill/preview', methods=['GET'])
+@role_required(['Admin', 'Family'])
+def preview_patient_bill(id):
+    """Generate and return a billing PDF for preview."""
+    if not check_db(): return jsonify({"error": "Database error"}), 500
+    try:
+        from bson.objectid import ObjectId
+        from services.pdf_engine import generate_billing_pdf
+        from flask import make_response
+
+        patient = mongo.db.patients.find_one({'_id': ObjectId(id)})
+        if not patient:
+            return "Patient not found", 404
+
+        # Access Control for Family role
+        user_id = get_current_user_id()
+        user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+        if user and user.get('role') == 'Family':
+            if ObjectId(id) not in user.get('patient_ids', []):
+                return "Unauthorized: You do not have access to this patient's bill", 403
+
+        # --- FINANCIAL CALCULATION (Sync with worker.py) ---
+        admission_date = patient.get('admissionDate')
+        days_elapsed = 0
+        if admission_date:
+            try:
+                if isinstance(admission_date, str):
+                    admission_dt = datetime.fromisoformat(admission_date.replace('Z', '+00:00'))
+                else:
+                    admission_dt = admission_date
+                days_elapsed = max(0, (datetime.now() - admission_dt.replace(tzinfo=None)).days)
+            except:
+                days_elapsed = 0
+
+        monthly_fee_raw = int(str(patient.get('monthlyFee', '0')).replace(',', '') or '0')
+        prorated_fee = int((monthly_fee_raw / 30.0) * max(days_elapsed, 1))
+
+        canteen_agg = list(mongo.db.canteen_sales.aggregate([
+            {'$match': {'patient_id': ObjectId(id)}},
+            {'$group': {'_id': None, 'total': {'$sum': '$amount'}}}
+        ]))
+        canteen_total = canteen_agg[0]['total'] if canteen_agg else 0
+        laundry = patient.get('laundryAmount', 0) if patient.get('laundryStatus') else 0
+        received = int(str(patient.get('receivedAmount', '0')).replace(',', '') or '0')
+
+        total_charges = prorated_fee + canteen_total + laundry
+        balance_due = total_charges - received
+
+        financial = {
+            'month_year': datetime.now().strftime('%B %Y'),
+            'days_elapsed': days_elapsed,
+            'monthly_fee': monthly_fee_raw,
+            'prorated_fee': prorated_fee,
+            'canteen_total': canteen_total,
+            'laundry_amount': laundry,
+            'total_charges': total_charges,
+            'received_amount': received,
+            'balance_due': balance_due,
+        }
+
+        patient_data = {
+            '_id': str(patient['_id']),
+            'name': decrypt_data(patient.get('name', '')),
+            'fatherName': patient.get('fatherName', ''),
+            'cnic': decrypt_data(patient.get('cnic', '')),
+            'contactNo': decrypt_data(patient.get('contactNo', '')),
+            'address': patient.get('address', ''),
+            'admissionDate': str(patient.get('admissionDate', '')),
+        }
+
+        pdf_bytes, err = generate_billing_pdf(patient_data, financial)
+        if err:
+            # If PDF fails, return the HTML bytes (which pdf_engine provides as fallback)
+            # but change the content type to HTML so the browser can display it.
+            response = make_response(pdf_bytes)
+            response.headers['Content-Type'] = 'text/html'
+            return response
+
+        response = make_response(pdf_bytes)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=bill_{id}.pdf'
+        return response
+
+    except Exception as e:
+        print(f"Preview Error: {e}")
+        return str(e), 500
+
+
+@app.route('/api/whatsapp/trigger-daily-report', methods=['POST'])
+@role_required(['Admin'])
+def trigger_daily_report_manually():
+    """Manually trigger daily report dispatch."""
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        today = datetime.now().date().isoformat()
+        family_users = list(mongo.db.users.find({
+            'role': 'Family',
+            'deleted_at': {'$exists': False},
+            'patient_ids': {'$exists': True, '$ne': []}
+        }))
+        queued = 0
+        for fuser in family_users:
+            phone = str(fuser.get('phone') or '').strip()
+            if not phone:
+                continue
+            for pid in fuser.get('patient_ids', []):
+                task_queue.enqueue('worker.task_send_daily_report',
+                                   patient_id=str(pid), phone_number=phone, report_date=today)
+                queued += 1
+        return jsonify({'message': f'Daily reports queued for {queued} patient-family pairs', 'queued': queued})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/whatsapp/send-alert', methods=['POST'])
+@role_required(['Admin'])
+def send_whatsapp_alert():
+    """Send a custom admin alert via WhatsApp."""
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        data = clean_input_data(request.json or {})
+        phone = data.get('phone', '').strip()
+        message = data.get('message', '').strip()
+        if not phone or not message:
+            return jsonify({'error': 'phone and message are required'}), 400
+        task_queue.enqueue('services.whatsapp.send_admin_alert',
+                           phone_number=phone, alert_message=message)
+        return jsonify({'message': 'Alert queued'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# =============================================================
+#  MEETING MANAGEMENT
+# =============================================================
+
+@app.route('/api/meetings', methods=['GET'])
+@login_required
+def list_meetings():
+    """List meeting requests. Family users see only their own; Admin sees all."""
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        user_id = get_current_user_id()
+        user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        query = {}
+        if user.get('role') == 'Family':
+            query['family_user_id'] = user_id
+
+        status_filter = request.args.get('status')
+        if status_filter:
+            query['status'] = status_filter
+
+        meetings = list(mongo.db.meetings.find(query).sort('created_at', -1))
+        for m in meetings:
+            m['_id'] = str(m['_id'])
+            m['created_at'] = m['created_at'].isoformat() if m.get('created_at') else ''
+            m['confirmed_date'] = m['confirmed_date'].isoformat() if m.get('confirmed_date') else None
+        return jsonify(meetings)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/meetings', methods=['POST'])
+@role_required(['Family'])
+def request_meeting():
+    """Family user requests a meeting or reschedule."""
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        user_id = get_current_user_id()
+        user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        data = clean_input_data(request.json or {})
+        patient_id = data.get('patient_id', '')
+        meeting_type = data.get('type', 'physical')  # physical | online
+        requested_date = data.get('requested_date', '')  # ISO string
+        note = data.get('note', '')
+
+        if not patient_id or not requested_date:
+            return jsonify({'error': 'patient_id and requested_date are required'}), 400
+
+        # Ensure family has access to this patient
+        authorized_ids = [str(pid) for pid in user.get('patient_ids', [])]
+        if patient_id not in authorized_ids:
+            return jsonify({'error': 'Access denied to this patient'}), 403
+
+        try:
+            req_dt = datetime.fromisoformat(requested_date.replace('Z', '+00:00'))
+        except ValueError:
+            return jsonify({'error': 'Invalid date format'}), 400
+
+        patient = mongo.db.patients.find_one({'_id': ObjectId(patient_id)}, {'name': 1})
+        meeting = {
+            'patient_id': patient_id,
+            'patient_name': patient.get('name', '') if patient else '',
+            'family_user_id': user_id,
+            'family_name': user.get('name', user.get('username', '')),
+            'type': meeting_type,
+            'requested_date': req_dt,
+            'status': 'pending',
+            'admin_note': '',
+            'confirmed_date': None,
+            'note': note,
+            'created_at': datetime.now()
+        }
+        result = mongo.db.meetings.insert_one(meeting)
+
+        # Alert admin via WhatsApp if configured
+        admin = mongo.db.users.find_one({'username': 'ImranSaab'}, {'phone': 1})
+        admin_phone = admin.get('phone', '') if admin else ''
+        if admin_phone:
+            alert_msg = (f"📅 New meeting request from {meeting['family_name']} "
+                         f"for {meeting['patient_name']} on "
+                         f"{req_dt.strftime('%d %b %Y')} ({meeting_type}).")
+            task_queue.enqueue('services.whatsapp.send_admin_alert',
+                               phone_number=admin_phone, alert_message=alert_msg)
+
+        return jsonify({'message': 'Meeting requested', 'id': str(result.inserted_id)}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/meetings/<id>', methods=['PUT'])
+@role_required(['Admin'])
+def update_meeting(id):
+    """Admin accepts, reschedules, or rejects a meeting request."""
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        data = clean_input_data(request.json or {})
+        new_status = data.get('status', 'accepted')  # accepted | rescheduled | rejected
+        admin_note = data.get('admin_note', '')
+        confirmed_date_str = data.get('confirmed_date', '')
+
+        confirmed_date = None
+        if confirmed_date_str:
+            try:
+                confirmed_date = datetime.fromisoformat(confirmed_date_str.replace('Z', '+00:00'))
+            except ValueError:
+                return jsonify({'error': 'Invalid confirmed_date format'}), 400
+
+        meeting = mongo.db.meetings.find_one({'_id': ObjectId(id)})
+        if not meeting:
+            return jsonify({'error': 'Meeting not found'}), 404
+
+        update_data = {
+            'status': new_status,
+            'admin_note': admin_note,
+            'confirmed_date': confirmed_date,
+            'updated_by': session.get('username', ''),
+            'updated_at': datetime.now()
+        }
+        mongo.db.meetings.update_one({'_id': ObjectId(id)}, {'$set': update_data})
+
+        # Notify family via WhatsApp
+        family_user = mongo.db.users.find_one({'_id': ObjectId(meeting['family_user_id'])}, {'phone': 1, 'name': 1})
+        family_phone = family_user.get('phone', '') if family_user else ''
+        if family_phone:
+            status_text = {'accepted': '✅ Confirmed', 'rescheduled': '🔄 Rescheduled', 'rejected': '❌ Declined'}.get(new_status, new_status)
+            date_str = confirmed_date.strftime('%d %b %Y, %I:%M %p') if confirmed_date else meeting.get('requested_date', '').strftime('%d %b %Y') if meeting.get('requested_date') else ''
+            alert = (f"{status_text}: Your meeting request for *{meeting.get('patient_name')}* "
+                     f"has been {new_status}.\n")
+            if date_str:
+                alert += f"📅 Date: {date_str}\n"
+            if admin_note:
+                alert += f"📝 Note: {admin_note}"
+            task_queue.enqueue('services.whatsapp.send_admin_alert',
+                               phone_number=family_phone, alert_message=alert)
+
+        return jsonify({'message': f'Meeting {new_status}'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/meetings/<id>', methods=['DELETE'])
+@login_required
+def cancel_meeting(id):
+    """Cancel/delete a meeting request."""
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        user_id = get_current_user_id()
+        user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+        meeting = mongo.db.meetings.find_one({'_id': ObjectId(id)})
+        if not meeting:
+            return jsonify({'error': 'Meeting not found'}), 404
+        # Family can only cancel their own; Admin can cancel any
+        if user.get('role') == 'Family' and meeting.get('family_user_id') != user_id:
+            return jsonify({'error': 'Access denied'}), 403
+        # mongo.db.meetings.delete_one({'_id': ObjectId(id)})
+        mongo.db.meetings.update_one({'_id': ObjectId(id)}, {'$set': {'deleted_at': datetime.now()}})
+        return jsonify({'message': 'Meeting cancelled (soft-deleted)'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# =============================================================
+#  AUDIT LOGS
+# =============================================================
+
+@app.route('/api/audit-logs', methods=['GET'])
+@role_required(['Admin'])
+def get_audit_logs():
+    """View system audit trail — Admin only."""
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        limit = int(request.args.get('limit', 100))
+        user_filter = request.args.get('user_id')
+        method_filter = request.args.get('method')
+        query = {}
+        if user_filter:
+            query['user_id'] = user_filter
+        if method_filter:
+            query['method'] = method_filter.upper()
+        logs = list(mongo.db.audit_logs.find(query).sort('timestamp', -1).limit(limit))
+        for log in logs:
+            log['_id'] = str(log['_id'])
+            log['timestamp'] = log['timestamp'].isoformat() if log.get('timestamp') else ''
+        return jsonify(logs)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# =============================================================
+#  MFA / OTP (Phase 4 — requires WhatsApp to be live)
+# =============================================================
+
+_otp_store = {}  # In-memory OTP store {user_id: {otp, expires_at}}
+
+
+@app.route('/api/auth/mfa/request', methods=['POST'])
+def mfa_request_otp():
+    """Send a WhatsApp OTP to the logged-in user's phone. Requires MFA_ENABLED=true."""
+    if os.getenv('MFA_ENABLED', 'false').lower() != 'true':
+        return jsonify({'message': 'MFA is not enabled'}), 200
+    if not check_db(): return jsonify({'error': 'Database error'}), 500
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return jsonify({'error': 'Not authenticated'}), 401
+        user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        phone = str(user.get('phone') or user.get('contactNo') or '').strip()
+        if not phone:
+            return jsonify({'error': 'No phone number on file for MFA'}), 400
+
+        otp = ''.join(random.choices(string.digits, k=6))
+        expires_at = datetime.now() + timedelta(minutes=5)
+        _otp_store[user_id] = {'otp': otp, 'expires_at': expires_at}
+
+        task_queue.enqueue('services.whatsapp.send_otp',
+                           phone_number=phone, otp_code=otp, username=user.get('username', ''))
+        return jsonify({'message': 'OTP sent via WhatsApp', 'expires_in': 300})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/auth/mfa/verify', methods=['POST'])
+def mfa_verify_otp():
+    """Verify the OTP submitted by the user."""
+    if os.getenv('MFA_ENABLED', 'false').lower() != 'true':
+        return jsonify({'verified': True, 'message': 'MFA not enabled — auto-verified'}), 200
+    try:
+        data = clean_input_data(request.json or {})
+        user_id = get_current_user_id()
+        submitted_otp = data.get('otp', '')
+        if not user_id:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        record = _otp_store.get(user_id)
+        if not record:
+            return jsonify({'error': 'No OTP requested or already used'}), 400
+        if datetime.now() > record['expires_at']:
+            _otp_store.pop(user_id, None)
+            return jsonify({'error': 'OTP expired'}), 400
+        if submitted_otp != record['otp']:
+            return jsonify({'error': 'Invalid OTP'}), 401
+
+        _otp_store.pop(user_id, None)  # Single-use
+
+        # Issue Tokens and Session
+        session['user_id'] = user_id
+        session['username'] = user['username']
+        session['role'] = user['role']
+        
+        access_token = jwt.encode({
+            'user_id': user_id,
+            'role': user['role'],
+            'exp': datetime.utcnow() + timedelta(minutes=15)
+        }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+        
+        refresh_token = jwt.encode({
+            'user_id': user_id,
+            'exp': datetime.utcnow() + timedelta(days=7)
+        }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+        
+        response = jsonify({
+            "verified": True,
+            "message": "MFA verified",
+            "username": user['username'],
+            "role": user['role'],
+            "name": user.get('name', user['username']),
+            "user_id": user_id,
+            "access_token": access_token
+        })
+        response.set_cookie('refresh_token', refresh_token, httponly=True, secure=True, samesite='Strict')
+        return response
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# =============================================================
+#  SCHEDULER STATUS
+# =============================================================
+
+@app.route('/api/scheduler/status', methods=['GET'])
+@role_required(['Admin'])
+def scheduler_status():
+    """Check APScheduler job status."""
+    if _scheduler is None:
+        return jsonify({'enabled': False, 'message': 'Scheduler not running'})
+    jobs = []
+    for job in _scheduler.get_jobs():
+        jobs.append({
+            'id': job.id,
+            'name': job.name,
+            'next_run': job.next_run_time.isoformat() if job.next_run_time else None
+        })
+    return jsonify({'enabled': True, 'running': _scheduler.running, 'jobs': jobs})
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
