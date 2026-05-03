@@ -99,9 +99,17 @@ const formatCurrency = (amount) => new Intl.NumberFormat('en-PK', {
 
 const formatNumber = (amount) => new Intl.NumberFormat('en-US').format(Number(amount) || 0);
 
-const canViewReports = () => ['Admin', 'Doctor', 'Staff'].includes(dashboardState.currentUser.role);
+const canViewReports = () => ['Admin', 'Doctor', 'Staff', 'Psychologist'].includes(dashboardState.currentUser.role);
 const canSaveLayouts = () => dashboardState.currentUser.role === 'Admin';
 const canViewFinanceCards = () => dashboardState.currentUser.role === 'Admin';
+
+function isPatientDischarged(value) {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return ['true', '1', 'yes'].includes(normalized);
+  }
+  return value === true;
+}
 
 function escapeHtml(str = '') {
   return String(str)
@@ -239,7 +247,14 @@ async function updateDashboard() {
     dateInput.value = localIso;
   }
 
-  await loadDailyReport();
+  if (canViewReports()) {
+    document.getElementById('reports-content')?.classList.remove('hidden');
+    document.getElementById('reports-no-access')?.classList.add('hidden');
+    await loadDailyReport();
+  } else {
+    document.getElementById('reports-content')?.classList.add('hidden');
+    document.getElementById('reports-no-access')?.classList.remove('hidden');
+  }
 }
 
 async function openAdmissionsModal() {
@@ -358,7 +373,7 @@ async function openEmergencyModal() {
 
   try {
     const patients = await fetchPatients();
-    const activePatients = patients.filter((patient) => !patient.isDischarged);
+    const activePatients = patients.filter((patient) => !isPatientDischarged(patient.isDischarged));
     if (activePatients.length === 0) {
       select.innerHTML = '<option value="">No active patients found</option>';
       return;
@@ -722,19 +737,32 @@ async function loadDailyReport() {
     dashboardState.nightConfig = mergeWithDefaults(undefined, DEFAULT_NIGHT_CONFIG, NIGHT_COLUMN_ORDER);
   }
 
-  const patients = await fetchPatients();
-  const activePatients = patients.filter((patient) => !patient.isDischarged);
+  const reportMap = {};
+  let activePatients = [];
 
-  const { response, data } = await window.apiFetchJson(`/api/reports?date=${dateInput.value}`);
-  if (!response.ok) {
-    window.showToast(data?.error || 'Unable to load report data.', true);
-    return;
+  try {
+    const patients = await fetchPatients();
+    activePatients = Array.isArray(patients)
+      ? patients.filter((patient) => !isPatientDischarged(patient.isDischarged))
+      : [];
+  } catch (error) {
+    console.error('Patients load error', error);
+    window.showToast('Unable to load patients for shift report.', true);
   }
 
-  const reportMap = {};
-  (data || []).forEach((report) => {
-    reportMap[report.patient_id] = report.schedule || {};
-  });
+  try {
+    const { response, data } = await window.apiFetchJson(`/api/reports?date=${dateInput.value}`);
+    if (!response.ok) {
+      throw new Error(data?.error || 'Unable to load report data.');
+    }
+
+    (data || []).forEach((report) => {
+      reportMap[report.patient_id] = report.schedule || {};
+    });
+  } catch (error) {
+    console.error('Report load error', error);
+    window.showToast(error.message || 'Unable to load report data.', true);
+  }
 
   renderSplitTable('day', dashboardState.dayConfig, activePatients, reportMap);
   renderSplitTable('night', dashboardState.nightConfig, activePatients, reportMap);

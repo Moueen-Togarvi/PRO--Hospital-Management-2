@@ -23,7 +23,7 @@ class PageContext:
         self.manual_discharge_page_roles = {"Admin"}
         self.overheads_page_roles = {"Admin"}
         self.monthly_overheads_page_roles = {"Admin"}
-        self.report_page_roles = {"Admin", "Doctor", "Staff"}
+        self.report_page_roles = {"Admin", "Doctor", "Staff", "Psychologist"}
         self.staff_dashboard_page_roles = {"General Staff"}
 
     def clear_session(self):

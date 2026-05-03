@@ -13,7 +13,7 @@ def register_reports_api_routes(
     role_required,
 ):
     @app.route('/api/reports', methods=['GET'])
-    @role_required(['Admin', 'Staff', 'Doctor'])
+    @role_required(['Admin', 'Staff', 'Doctor', 'Psychologist'])
     def get_daily_report():
         if not check_db():
             return jsonify({"error": "Database error"}), 500
@@ -33,7 +33,7 @@ def register_reports_api_routes(
             return jsonify({"error": str(error)}), 500
 
     @app.route('/api/reports/update', methods=['POST'])
-    @role_required(['Admin', 'Staff', 'Doctor'])
+    @role_required(['Admin', 'Staff', 'Doctor', 'Psychologist'])
     def update_daily_report():
         if not check_db():
             return jsonify({"error": "Database error"}), 500
