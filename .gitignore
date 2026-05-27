@@ -11,3 +11,5 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+.local-mongodb/
+.flask-server.log
