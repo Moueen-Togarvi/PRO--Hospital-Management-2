@@ -55,11 +55,28 @@ from services.site_profile import get_site_profile
 app = Flask(__name__)
 CORS(app)
 Talisman(app, content_security_policy=None, force_https=False)  # Disabled force_https for local development
+
+
+def _env_bool(name, default=True):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _rate_limit_defaults():
+    raw_limits = os.environ.get("RATE_LIMIT_DEFAULTS", "100000 per day, 10000 per hour")
+    if raw_limits.strip().lower() in {"", "0", "false", "none", "off"}:
+        return []
+    return [limit.strip() for limit in raw_limits.split(",") if limit.strip()]
+
+
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=_rate_limit_defaults(),
     storage_uri="memory://",
+    enabled=_env_bool("RATE_LIMIT_ENABLED", True),
 )
 
 # --- CONFIGURATION ---
