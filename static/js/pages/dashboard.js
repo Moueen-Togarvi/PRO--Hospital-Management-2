@@ -229,12 +229,14 @@ async function updateDashboard() {
     const admittedEl = document.getElementById('dash-admitted');
     const dischargedEl = document.getElementById('dash-discharged');
     const psychEl = document.getElementById('dash-psy-sessions');
+    const canteenSalesEl = document.getElementById('dash-canteen-sales');
     const monthEl = document.getElementById('dash-month-label');
 
     if (totalEl) totalEl.innerText = formatNumber(data.totalPatients);
     if (admittedEl) admittedEl.innerText = formatNumber(data.admissionsThisMonth || 0);
     if (dischargedEl) dischargedEl.innerText = formatNumber(data.dischargesThisMonth || 0);
     if (psychEl) psychEl.innerText = formatNumber(data.totalPsychSessionsToday || 0);
+    if (canteenSalesEl) canteenSalesEl.innerText = formatCurrency(data.totalCanteenSalesThisMonth || 0);
     if (monthEl) monthEl.innerText = monthLabel;
   } catch (error) {
     console.error('Dashboard Error', error);
@@ -778,11 +780,11 @@ function getStatusClass(status) {
 }
 
 function getStatusIcon(status) {
-  if (status === 'done') return '<i class="fas fa-check text-green-600 text-sm"></i>';
-  if (status === 'not_done') return '<i class="fas fa-times text-red-600 text-sm"></i>';
-  if (status === 'complaint') return '<i class="fas fa-exclamation text-yellow-600 text-sm"></i>';
-  if (status === 'med') return '<span class="text-blue-600 text-xs font-bold">Med</span>';
-  if (status === 'wc') return '<span class="text-purple-600 text-xs font-bold">WC</span>';
+  if (status === 'done') return '<i class="fas fa-check text-xs text-green-600"></i>';
+  if (status === 'not_done') return '<i class="fas fa-times text-xs text-red-600"></i>';
+  if (status === 'complaint') return '<i class="fas fa-exclamation text-xs text-yellow-600"></i>';
+  if (status === 'med') return '<span class="text-[10px] font-bold text-blue-600">Med</span>';
+  if (status === 'wc') return '<span class="text-[10px] font-bold text-purple-600">WC</span>';
   return '<span class="text-slate-300 text-xs">•</span>';
 }
 
@@ -799,7 +801,7 @@ async function cycleReportStatus(button, patientId, slotKey, currentStatus, repo
     else if (currentStatus === 'complaint') nextStatus = '';
   }
 
-  button.className = `w-full h-6 rounded flex items-center justify-center transition-all text-xs ${getStatusClass(nextStatus)}`;
+  button.className = `flex h-5 w-full items-center justify-center rounded text-[11px] transition-all ${getStatusClass(nextStatus)}`;
   button.innerHTML = getStatusIcon(nextStatus);
   button.dataset.status = nextStatus || '';
   button.setAttribute('aria-label', statusLabelMap[nextStatus] || 'No Status');
@@ -839,9 +841,11 @@ function renderSplitTable(type, columns, patients, reportMap) {
   const tbody = document.getElementById(`${type}-table-body`);
   if (!headerRow || !tbody) return;
 
+  headerRow.closest('table')?.style.setProperty('--report-column-count', String(columns.length || 1));
+
   const editableHeaders = canSaveLayouts();
-  const headerBaseClass = 'px-2 py-3 text-left whitespace-nowrap sticky left-0 z-20 bg-emerald-600 text-white shadow-md';
-  let headersHtml = `<th id="${type}-patient-header" class="${headerBaseClass}" style="min-width: 120px; max-width: 160px;"><span class="patient-header-label font-semibold tracking-wide text-xs">Patient</span></th>`;
+  const headerBaseClass = 'sticky left-0 z-20 whitespace-nowrap bg-emerald-600 px-2 py-2 text-left text-white shadow-sm';
+  let headersHtml = `<th id="${type}-patient-header" class="${headerBaseClass}" style="width: var(--report-patient-width); min-width: var(--report-patient-width); max-width: var(--report-patient-width);"><span class="patient-header-label text-[11px] font-semibold tracking-wide">Patient</span></th>`;
 
   columns.forEach((column, index) => {
     headersHtml += `
@@ -850,16 +854,16 @@ function renderSplitTable(type, columns, patients, reportMap) {
         data-idx="${index}"
         title="${escapeHtml(column.label || '')}"
         ${editableHeaders ? 'onblur="window.markLayoutDirty()"' : ''}
-        class="px-1 py-3 text-center align-middle whitespace-normal min-w-[64px] max-w-[84px] border-l border-white/20 ${editableHeaders ? 'cursor-text hover:bg-white/10' : ''}"
+        class="min-w-[58px] max-w-[76px] whitespace-normal border-l border-white/20 px-1 py-2 text-center align-middle ${editableHeaders ? 'cursor-text hover:bg-white/10' : ''}"
       >
-        <span class="block whitespace-pre-wrap text-[0.64rem] leading-tight">${escapeHtml(column.label || '')}</span>
+        <span class="block whitespace-pre-wrap text-[0.58rem] leading-tight">${escapeHtml(column.label || '')}</span>
       </th>
     `;
   });
   headerRow.innerHTML = headersHtml;
 
   if (patients.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${columns.length + 1}" class="p-6 text-center text-slate-400">No active patients.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${columns.length + 1}" class="p-3 text-center text-xs text-slate-400">No active patients.</td></tr>`;
     return;
   }
 
@@ -873,7 +877,7 @@ function renderSplitTable(type, columns, patients, reportMap) {
     let hasIssue = false;
 
     let rowHtml = `
-      <td class="sticky left-0 z-20 max-w-[160px] whitespace-nowrap border-r bg-emerald-50 px-2 py-2 text-[0.68rem] font-bold text-emerald-900">
+      <td class="sticky left-0 z-20 whitespace-nowrap border-r bg-emerald-50 px-2 py-1.5 text-[0.64rem] font-bold text-emerald-900" style="width: var(--report-patient-width); min-width: var(--report-patient-width); max-width: var(--report-patient-width);">
         <span class="block truncate" title="${escapeHtml(patient.name || '')}">${escapeHtml(patient.name || 'Unknown')}</span>
       </td>
     `;
@@ -882,9 +886,9 @@ function renderSplitTable(type, columns, patients, reportMap) {
       const status = schedule[column.key];
       if (status === 'complaint') hasIssue = true;
       rowHtml += `
-        <td class="border p-1 text-center align-middle">
+        <td class="border p-0.5 text-center align-middle">
           <button
-            class="w-full h-6 rounded flex items-center justify-center transition-all text-xs ${getStatusClass(status)}"
+            class="flex h-5 w-full items-center justify-center rounded text-[11px] transition-all ${getStatusClass(status)}"
             data-status="${status || ''}"
             aria-label="${statusLabelMap[status] || 'No Status'}"
           >
@@ -917,7 +921,7 @@ function renderSplitTable(type, columns, patients, reportMap) {
 
   if (flaggedRows.length === 0 && normalRows.length > 0) {
     const infoRow = document.createElement('tr');
-    infoRow.innerHTML = `<td colspan="${columns.length + 1}" class="px-4 py-4 text-center text-sm font-semibold text-emerald-800 bg-emerald-50">All patients are currently on track.</td>`;
+    infoRow.innerHTML = `<td colspan="${columns.length + 1}" class="bg-emerald-50 px-3 py-2 text-center text-xs font-semibold text-emerald-800">All patients are currently on track.</td>`;
     fragment.appendChild(infoRow);
   }
 
@@ -926,8 +930,8 @@ function renderSplitTable(type, columns, patients, reportMap) {
   if (normalRows.length > 0) {
     const toggleRow = document.createElement('tr');
     toggleRow.innerHTML = `
-      <td colspan="${columns.length + 1}" class="bg-amber-50 py-3 text-center">
-        <button type="button" id="report-toggle-btn-${type}" class="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-700 shadow-sm hover:bg-amber-100 transition">
+      <td colspan="${columns.length + 1}" class="bg-amber-50 py-2 text-center">
+        <button type="button" id="report-toggle-btn-${type}" class="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 shadow-sm transition hover:bg-amber-100">
           ${state.showAll ? '<i class="fas fa-eye-slash"></i> Hide On-Track Patients' : `<i class="fas fa-eye"></i> Show ${normalRows.length} On-Track Patients`}
         </button>
       </td>
@@ -938,7 +942,7 @@ function renderSplitTable(type, columns, patients, reportMap) {
 
   if (flaggedRows.length === 0 && normalRows.length === 0) {
     const emptyRow = document.createElement('tr');
-    emptyRow.innerHTML = `<td colspan="${columns.length + 1}" class="p-6 text-center text-slate-400">No active patients.</td>`;
+    emptyRow.innerHTML = `<td colspan="${columns.length + 1}" class="p-3 text-center text-xs text-slate-400">No active patients.</td>`;
     fragment.appendChild(emptyRow);
   }
 
