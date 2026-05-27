@@ -228,6 +228,13 @@
   color: #047857;
 }
 
+img.print-logo-icon {
+  height: 3.25rem;
+  width: 3.25rem;
+  border-radius: 999px;
+  object-fit: contain;
+}
+
 .print-title-block {
   text-align: center;
 }

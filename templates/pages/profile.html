@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section id="profile-settings-view" class="view-section -mx-4 -my-5 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
+  <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h2 class="text-2xl font-black text-emerald-950">Profile Settings</h2>
+      <p class="mt-1 text-sm font-semibold text-slate-500">Website, reports, receipts, and print branding</p>
+    </div>
+    <a href="/dashboard" class="inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50">
+      <i class="fas fa-arrow-left"></i>
+      <span>Dashboard</span>
+    </a>
+  </div>
+
+  <form id="site-profile-form" class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+    <div class="panel-card p-5">
+      <div class="grid gap-4 md:grid-cols-2">
+        <label class="block">
+          <span class="app-field-label">Organization Name</span>
+          <input id="profile-name" class="app-field" maxlength="120" required />
+        </label>
+        <label class="block">
+          <span class="app-field-label">Short Mark</span>
+          <input id="profile-short-name" class="app-field" maxlength="24" required />
+        </label>
+        <label class="block">
+          <span class="app-field-label">System Name</span>
+          <input id="profile-system-name" class="app-field" maxlength="80" required />
+        </label>
+        <label class="block">
+          <span class="app-field-label">Topbar Label</span>
+          <input id="profile-header-label" class="app-field" maxlength="40" required />
+        </label>
+        <label class="block">
+          <span class="app-field-label">Phase Label</span>
+          <input id="profile-phase-label" class="app-field" maxlength="32" required />
+        </label>
+        <label class="block">
+          <span class="app-field-label">Owner Name</span>
+          <input id="profile-owner-name" class="app-field" maxlength="100" required />
+        </label>
+        <label class="block md:col-span-2">
+          <span class="app-field-label">Tagline</span>
+          <input id="profile-tagline" class="app-field" maxlength="160" required />
+        </label>
+        <label class="block">
+          <span class="app-field-label">Phone Number</span>
+          <input id="profile-phone" class="app-field" maxlength="40" required />
+        </label>
+        <label class="block">
+          <span class="app-field-label">Email</span>
+          <input id="profile-email" type="email" class="app-field" maxlength="120" required />
+        </label>
+        <label class="block">
+          <span class="app-field-label">Website</span>
+          <input id="profile-website-url" class="app-field" maxlength="200" />
+        </label>
+        <label class="block">
+          <span class="app-field-label">Address</span>
+          <input id="profile-address" class="app-field" maxlength="180" required />
+        </label>
+        <label class="block md:col-span-2">
+          <span class="app-field-label">Logo URL</span>
+          <input id="profile-logo-url" class="app-field" />
+        </label>
+        <label class="block md:col-span-2">
+          <span class="app-field-label">Upload Logo</span>
+          <input id="profile-logo-file" type="file" accept="image/*" class="w-full rounded-xl border border-emerald-100 bg-white p-2 text-sm font-semibold text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:text-sm file:font-black file:text-emerald-700 hover:file:bg-emerald-100" />
+        </label>
+      </div>
+
+      <div class="mt-6 flex flex-col gap-3 border-t border-emerald-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <button id="password-button" class="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100" type="button">
+          <i class="fas fa-key"></i>
+          <span>Password</span>
+        </button>
+        <button id="profile-save-button" class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700" type="submit">
+          <i class="fas fa-save"></i>
+          <span>Save Profile</span>
+        </button>
+      </div>
+    </div>
+
+    <aside class="panel-card p-5">
+      <div class="flex flex-col items-center text-center">
+        <div class="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50 text-3xl text-emerald-700">
+          <img id="profile-logo-preview" src="" alt="Logo preview" class="hidden h-full w-full object-contain" />
+          <i id="profile-logo-fallback" class="fas fa-brain"></i>
+        </div>
+        <p id="profile-preview-short-name" class="mt-4 text-xs font-black uppercase tracking-[0.22em] text-emerald-500"></p>
+        <h3 id="profile-preview-name" class="mt-1 text-xl font-black text-emerald-950"></h3>
+        <p id="profile-preview-tagline" class="mt-2 text-sm font-semibold text-slate-500"></p>
+      </div>
+
+      <div class="mt-5 space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 text-sm">
+        <div class="flex items-center gap-2 text-emerald-900">
+          <i class="fas fa-user-tie w-4 text-emerald-600"></i>
+          <span id="profile-preview-owner" class="font-bold"></span>
+        </div>
+        <div class="flex items-center gap-2 text-emerald-900">
+          <i class="fas fa-phone w-4 text-emerald-600"></i>
+          <span id="profile-preview-phone" class="font-bold"></span>
+        </div>
+        <div class="flex items-center gap-2 text-emerald-900">
+          <i class="fas fa-envelope w-4 text-emerald-600"></i>
+          <span id="profile-preview-email" class="truncate font-bold"></span>
+        </div>
+        <div class="flex items-start gap-2 text-emerald-900">
+          <i class="fas fa-location-dot mt-0.5 w-4 text-emerald-600"></i>
+          <span id="profile-preview-address" class="font-bold"></span>
+        </div>
+      </div>
+    </aside>
+  </form>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{{ url_for('static', filename='js/pages/profile.js') }}"></script>
+{% endblock %}

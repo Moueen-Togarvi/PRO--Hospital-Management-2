@@ -39,6 +39,7 @@ from routes.patients_api import register_patient_api_routes
 from routes.patients_page import register_patient_page_routes
 from routes.pages import register_page_routes
 from routes.prescription_page import register_prescription_page_routes
+from routes.profile_page import register_profile_page_routes
 from routes.psych_sessions_page import register_psych_sessions_page_routes
 from routes.reports_api import register_reports_api_routes
 from routes.reports_page import register_report_page_routes
@@ -49,6 +50,7 @@ from routes.users_api import register_user_api_routes
 from routes.users_page import register_user_page_routes
 from routes.system_api import register_system_api_routes
 from services.encryption import encrypt_data, decrypt_data
+from services.site_profile import get_site_profile
 
 app = Flask(__name__)
 CORS(app)
@@ -166,6 +168,9 @@ def create_indices():
             
             # Daily Reports indices
             mongo.db.daily_reports.create_index([("patient_id", 1), ("date", -1)])
+
+            # App settings indices
+            mongo.db.app_settings.create_index([("key", 1)], unique=True)
             
             print("Database indices verified/created.")
         except Exception as e:
@@ -175,6 +180,11 @@ def create_indices():
 with app.app_context():
     ensure_initial_admin()
     create_indices()
+
+
+@app.context_processor
+def inject_site_profile():
+    return {"site_profile": get_site_profile(mongo)}
 
 # ── APScheduler (only in main process, not werkzeug reloader child) ───────────
 _scheduler = None
@@ -440,6 +450,7 @@ register_patient_api_routes(
 )
 register_patient_page_routes(app, page_context)
 register_prescription_page_routes(app, page_context)
+register_profile_page_routes(app, page_context)
 register_psych_sessions_page_routes(app, page_context)
 register_reports_api_routes(
     app,

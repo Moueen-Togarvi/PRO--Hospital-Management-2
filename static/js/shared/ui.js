@@ -1,5 +1,32 @@
 (function () {
   let successHideTimer = null;
+  const defaultSiteProfile = {
+    name: 'Pakistan Recovery Oasis',
+    system_name: 'PRO System',
+    header_label: 'PRO HMS',
+    short_name: 'PRO',
+    phase_label: 'Phase 1',
+    tagline: 'Addiction Treatment & Psychological Services',
+    owner_name: 'Imran Khan',
+    phone: '+966-557385262',
+    email: 'hashim@codedclouds.org',
+    address: 'Lahore, Pakistan',
+    website_url: 'https://pakistanrecoveryoasis.com',
+    logo_url: 'https://pakistanrecoveryoasis.com/Images/logo.png',
+  };
+
+  function getSiteProfile() {
+    return { ...defaultSiteProfile, ...(window.__APP__?.siteProfile || {}) };
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
   function closeSuccessModal() {
     const modal = document.getElementById('success-modal');
@@ -72,6 +99,8 @@
 
   window.showToast = showToast;
   window.apiFetchJson = apiFetchJson;
+  window.getSiteProfile = getSiteProfile;
+  window.escapeHtml = escapeHtml;
   window.confirmAction = async function confirmAction(message) {
     const modal = document.getElementById('confirm-modal');
     const messageEl = document.getElementById('confirm-message');

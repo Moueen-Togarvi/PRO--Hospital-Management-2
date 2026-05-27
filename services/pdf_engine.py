@@ -9,6 +9,7 @@ import logging
 import asyncio
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from services.site_profile import normalize_site_profile
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ def _generate_qr_base64(data: str) -> str:
         logger.warning(f"[PDF] QR code generation failed: {e}")
         return ""
 
-def generate_billing_pdf(patient: dict, financial: dict) -> tuple[bytes | None, str | None]:
+def generate_billing_pdf(patient: dict, financial: dict, site_profile: dict | None = None) -> tuple[bytes | None, str | None]:
     """
     Generate a professional billing PDF for a patient using Puppeteer.
     """
@@ -85,6 +86,7 @@ def generate_billing_pdf(patient: dict, financial: dict) -> tuple[bytes | None, 
             "qr_b64": qr_b64,
             "generated_at": datetime.now().strftime('%d %B %Y, %I:%M %p'),
             "currency": "PKR",
+            "site_profile": normalize_site_profile(site_profile),
         }
 
         html_content = template.render(**context)
@@ -107,7 +109,7 @@ def generate_billing_pdf(patient: dict, financial: dict) -> tuple[bytes | None, 
         logger.error(f"[PDF] Template rendering failed: {e}")
         return None, str(e)
 
-def generate_daily_report_pdf(patient: dict, reports: list) -> tuple[bytes | None, str | None]:
+def generate_daily_report_pdf(patient: dict, reports: list, site_profile: dict | None = None) -> tuple[bytes | None, str | None]:
     """
     Generate a PDF summary of daily reports using Puppeteer.
     """
@@ -134,7 +136,7 @@ def generate_daily_report_pdf(patient: dict, reports: list) -> tuple[bytes | Non
 </head>
 <body>
   <div class="header">
-    <h1>Pakistan Recovery Oasis</h1>
+    <h1>{{ site_profile.name }}</h1>
     <p>Daily Progress Summary: {{ patient.name }}</p>
   </div>
   <div class="container">
@@ -162,6 +164,7 @@ def generate_daily_report_pdf(patient: dict, reports: list) -> tuple[bytes | Non
         html = Template(template_str).render(
             patient=patient,
             reports=reports,
+            site_profile=normalize_site_profile(site_profile),
             generated_at=datetime.now().strftime('%d %B %Y, %I:%M %p')
         )
 

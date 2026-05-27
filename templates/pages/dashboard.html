@@ -79,29 +79,29 @@
 
 {% block content %}
 <section id="dashboard-view" class="view-section -mx-4 -my-5 p-4 md:-mx-8 md:-my-8 md:p-8">
-  <div class="relative mb-8 overflow-hidden rounded-2xl border border-red-200 bg-red-50/40 p-6 shadow-sm">
-    <div class="absolute top-0 right-0 p-8 opacity-5">
-      <i class="fas fa-heartbeat text-8xl text-red-600"></i>
+  <div class="relative mb-5 overflow-hidden rounded-2xl border border-red-200 bg-red-50/40 p-3 shadow-sm md:p-4">
+    <div class="absolute top-0 right-0 p-4 opacity-5">
+      <i class="fas fa-heartbeat text-6xl text-red-600"></i>
     </div>
-    <div class="relative z-10 mb-6 flex items-center justify-between">
+    <div class="relative z-10 mb-3 flex items-center justify-between">
       <div>
-        <h3 class="flex items-center gap-2 text-xl font-black tracking-tight text-red-600">
+        <h3 class="flex items-center gap-2 text-lg font-black tracking-tight text-red-600">
           <span class="blinking-dot"></span>
           <i class="fas fa-heartbeat"></i>
           Emergency / Critical Alerts
         </h3>
-        <p class="mt-1 text-xs font-medium italic text-gray-500">Real-time critical patient observations</p>
+        <p class="text-xs font-medium italic text-gray-500">Real-time critical patient observations</p>
       </div>
       <button onclick="openEmergencyModal()"
-        class="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-xs font-black text-white shadow-md transition-all duration-300 hover:bg-red-700">
+        class="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-black text-white shadow-md transition-all duration-300 hover:bg-red-700">
         <i class="fas fa-plus"></i> Add Alert
       </button>
     </div>
 
-    <div id="emergency-list" class="relative z-10 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-      <div class="col-span-full rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 py-8 text-center">
-        <i class="fas fa-check-circle mb-2 text-3xl text-emerald-400"></i>
-        <p class="text-sm font-bold uppercase tracking-wider text-gray-500">All Clear: No active clinical alerts</p>
+    <div id="emergency-list" class="relative z-10 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <div class="col-span-full rounded-xl border border-dashed border-gray-200 bg-gray-50 py-3 text-center">
+        <i class="fas fa-check-circle mb-1 text-xl text-emerald-400"></i>
+        <p class="text-xs font-bold uppercase tracking-wider text-gray-500">All Clear: No active clinical alerts</p>
       </div>
     </div>
   </div>

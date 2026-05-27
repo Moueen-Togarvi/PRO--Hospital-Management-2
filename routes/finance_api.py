@@ -1161,6 +1161,7 @@ def register_finance_api_routes(
 
         try:
             from services.pdf_engine import generate_billing_pdf
+            from services.site_profile import get_site_profile
 
             patient = mongo.db.patients.find_one({'_id': ObjectId(id)})
             if not patient:
@@ -1220,7 +1221,7 @@ def register_finance_api_routes(
                 'admissionDate': str(patient.get('admissionDate', '')),
             }
 
-            pdf_bytes, err = generate_billing_pdf(patient_data, financial)
+            pdf_bytes, err = generate_billing_pdf(patient_data, financial, get_site_profile(mongo))
             if err:
                 response = make_response(pdf_bytes)
                 response.headers['Content-Type'] = 'text/html'

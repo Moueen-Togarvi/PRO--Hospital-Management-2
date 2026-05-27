@@ -18,6 +18,7 @@
   .logo-col { width: 15%; text-align: left; }
   .logo-placeholder { width: 70px; height: 70px; background: #333; border-radius: 50%; display: inline-block; position: relative; overflow: hidden; }
   .logo-placeholder::before { content: ""; position: absolute; left: 45%; top: 10%; width: 5px; height: 80%; background: #fff; } /* Brain slit mimic */
+  .brand-logo { width: 70px; height: 70px; border-radius: 50%; object-fit: contain; }
 
   .center-col { width: 55%; text-align: center; line-height: 1.4; color: #555; }
   .center-col .pro-title { font-size: 18pt; font-weight: 900; color: #222; letter-spacing: 1px; margin-bottom: 2px; }
@@ -88,14 +89,18 @@
 <table class="header-table">
   <tr>
     <td class="logo-col">
+      {% if site_profile.logo_url %}
+      <img src="{{ site_profile.logo_url }}" alt="{{ site_profile.name }} logo" class="brand-logo" />
+      {% else %}
       <div class="logo-placeholder"></div>
+      {% endif %}
     </td>
     <td class="center-col">
-      <div class="pro-title">PRO</div>
-      <div class="pro-sub">PAKISTAN RECOVERY OASIS</div>
-      <div class="pro-desc">Addiction Treatment & Psychological Services</div>
-      <div class="pro-desc">Lahore, Pakistan</div>
-      <div class="pro-desc">📞 +92-321-4475444</div>
+      <div class="pro-title">{{ site_profile.short_name }}</div>
+      <div class="pro-sub">{{ site_profile.name | upper }}</div>
+      <div class="pro-desc">{{ site_profile.tagline }}</div>
+      <div class="pro-desc">{{ site_profile.address }}</div>
+      <div class="pro-desc">📞 {{ site_profile.phone }}</div>
     </td>
     <td class="right-col">
       <h1>DISCHARGE BILL</h1>
@@ -196,7 +201,7 @@
   </div>
   {% endif %}
 
-  <div class="sig-line">Admin / Authority</div>
+  <div class="sig-line">{{ site_profile.owner_name }} / Authority</div>
 </div>
 
 </body>

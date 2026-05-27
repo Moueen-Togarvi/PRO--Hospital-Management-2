@@ -3,7 +3,7 @@
  * Provides offline shell caching for mobile-first PWA experience.
  */
 
-const CACHE_NAME = 'pro-v2-shell-v4';
+const CACHE_NAME = 'pro-v2-shell-v6';
 const OFFLINE_URL = '/';
 
 // Shell assets to cache on install

@@ -11,13 +11,17 @@
   <div class="relative z-10 flex w-full max-w-6xl flex-col items-center justify-center gap-8 rounded-[2rem] border border-white/20 bg-white/8 p-5 shadow-2xl backdrop-blur-2xl lg:flex-row lg:p-10">
     <div class="flex min-w-0 flex-1 flex-col items-center justify-center text-center">
       <div class="logo-icon-login">
-        <img src="https://pakistanrecoveryoasis.com/Images/logo.png" alt="Pakistan Recovery Oasis logo" class="logo-img-login">
+        {% if site_profile.logo_url %}
+        <img src="{{ site_profile.logo_url }}" alt="{{ site_profile.name }} logo" class="logo-img-login">
+        {% else %}
+        <i class="fas fa-brain text-5xl text-white"></i>
+        {% endif %}
       </div>
-      <h1 class="brand-name-login">Pakistan</h1>
-      <p class="brand-name-login sub">Recovery Oasis</p>
+      <h1 class="brand-name-login">{{ site_profile.name }}</h1>
+      <p class="brand-name-login sub">{{ site_profile.tagline }}</p>
       <div class="mt-4 h-[2px] w-48 rounded-full bg-gradient-to-r from-emerald-300 via-teal-300 to-lime-300"></div>
       <p class="mt-6 max-w-md text-sm font-medium text-white/80">
-        Phase 1 of the new multi-page PRO system is live. Login and dashboard now have dedicated URLs and separate frontend files.
+        {{ site_profile.phase_label }} secure access for {{ site_profile.system_name }}.
       </p>
     </div>
 
@@ -59,14 +63,14 @@
           <div class="contact-icon-new"><i class="fas fa-phone-alt"></i></div>
           <div>
             <div class="contact-label">Phone</div>
-            <div class="contact-value">+966-557385262</div>
+            <div class="contact-value">{{ site_profile.phone }}</div>
           </div>
         </div>
         <div class="contact-item-new">
           <div class="contact-icon-new"><i class="fas fa-envelope"></i></div>
           <div>
             <div class="contact-label">E-Mail</div>
-            <div class="contact-value">hashim@codedclouds.org</div>
+            <div class="contact-value">{{ site_profile.email }}</div>
           </div>
         </div>
       </div>
@@ -129,4 +133,3 @@
 {% block extra_scripts %}
   <script src="{{ url_for('static', filename='js/pages/login.js') }}"></script>
 {% endblock %}
-

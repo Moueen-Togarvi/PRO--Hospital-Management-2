@@ -1,41 +1,38 @@
 <header class="sticky top-0 z-20 border-b border-emerald-100 bg-white/85 backdrop-blur-md">
-  <div class="flex items-center justify-between gap-4 px-4 py-4 md:px-8">
+  <div class="flex items-center justify-between gap-4 px-4 py-1.5 md:px-8">
     <div class="flex items-center gap-3">
-      <button id="sidebar-open-btn" class="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-emerald-700 shadow-sm transition hover:bg-emerald-100 md:hidden">
+      <button id="sidebar-open-btn" class="h-9 w-12 rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 md:hidden">
         <i class="fas fa-bars"></i>
       </button>
+      <button id="sidebar-toggle-btn" class="hidden h-9 w-12 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-sm transition hover:bg-emerald-100 md:inline-flex" type="button" aria-label="Toggle sidebar" title="Toggle sidebar">
+        <i class="fas fa-angles-left"></i>
+      </button>
       <div>
-        <p class="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-500">PRO HMS</p>
-        <h2 class="text-xl font-black tracking-tight text-emerald-950">{{ page_title }}</h2>
+        <p class="text-[10px] font-black uppercase leading-none tracking-[0.2em] text-emerald-500">{{ site_profile.header_label }}</p>
+        <h2 class="mt-1 text-lg font-black leading-none tracking-tight text-emerald-950">{{ page_title }}</h2>
       </div>
     </div>
 
     <div class="flex items-center gap-3">
       {% if current_user.role == 'Admin' %}
-      <div id="topbar-financial-controls" class="hidden md:flex items-center gap-2 bg-emerald-100/50 p-1 rounded-xl border border-emerald-100/50">
+      <div id="topbar-financial-controls" class="hidden md:flex items-center gap-2 rounded-xl border border-emerald-100/50 bg-emerald-100/50 p-1">
         <button onclick="openReceiptModal()"
-          class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-700 transition shadow-sm flex items-center gap-2 text-xs"
+          class="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-700"
           type="button">
           <i class="fas fa-receipt"></i> Receipt
         </button>
         <button onclick="openPaymentRecordsModal()"
-          class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-700 transition shadow-sm flex items-center gap-2 text-xs"
+          class="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-700"
           type="button">
           <i class="fas fa-list-alt"></i> Records
         </button>
       </div>
       {% endif %}
-      <div class="hidden rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-right shadow-sm sm:block">
-        <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500">{{ current_user.role }}</p>
-        <p class="max-w-[220px] truncate text-sm font-black text-emerald-900">{{ current_user.display_name }}</p>
+      <div class="hidden max-w-[290px] items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-1 shadow-sm sm:flex">
+        <span class="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-500">{{ current_user.role }}</span>
+        <span class="h-1 w-1 rounded-full bg-emerald-300"></span>
+        <span class="truncate text-[13px] font-black text-emerald-900">{{ current_user.display_name }}</span>
       </div>
-      <a
-        href="{% if current_user.role in ['Admin', 'Doctor', 'Psychologist', 'Canteen'] %}/dashboard{% elif current_user.role == 'Family' %}/family-dashboard{% elif current_user.role == 'General Staff' %}/staff-dashboard{% else %}/{% endif %}"
-        class="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-700 shadow-sm transition hover:bg-emerald-50"
-      >
-        <i class="fas fa-house"></i>
-        <span>Home</span>
-      </a>
     </div>
   </div>
 </header>

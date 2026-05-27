@@ -489,6 +489,10 @@ function buildPrintableTable(type) {
 }
 
 function generatePrintableReport(mode) {
+  const siteProfile = typeof window.getSiteProfile === 'function' ? window.getSiteProfile() : {};
+  const profileName = escapeHtml(siteProfile.name || 'Pakistan Recovery Oasis');
+  const profilePhone = escapeHtml(siteProfile.phone || '+966-557385262');
+  const profileSystemName = escapeHtml(siteProfile.system_name || siteProfile.short_name || 'PRO');
   const styles = `
     <style>
       @page { size: portrait; margin: 15mm; }
@@ -534,14 +538,14 @@ function generatePrintableReport(mode) {
     <html>
       <head>
         <meta charset="UTF-8" />
-        <title>PRO Daily Report</title>
+        <title>${profileSystemName} Daily Report</title>
         ${styles}
       </head>
       <body>
         <header>
-          <h1>Pakistan Recovery Oasis</h1>
+          <h1>${profileName}</h1>
           <p>Daily Patient Activity Report</p>
-          <p style="margin-top:4px;">&#9742; +966-557385262</p>
+          <p style="margin-top:4px;">&#9742; ${profilePhone}</p>
         </header>
         <div class="report-meta">
           <span>Date: ${reportDate}</span>

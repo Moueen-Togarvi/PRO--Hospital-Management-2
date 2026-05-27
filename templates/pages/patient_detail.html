@@ -229,12 +229,16 @@
 <div id="printable-area" class="hidden">
   <div class="print-container">
     <div class="print-header">
+      {% if site_profile.logo_url %}
+      <img src="{{ site_profile.logo_url }}" alt="{{ site_profile.name }} logo" class="print-logo-icon" />
+      {% else %}
       <i class="fas fa-brain print-logo-icon"></i>
+      {% endif %}
       <div class="print-title-block">
-        <div class="print-pro">PRO</div>
-        <div class="print-sub-pro">PAKISTAN RECOVERY OASIS</div>
-        <div class="print-tagline">Addiction Treatment & Psychological Services</div>
-        <div class="print-tagline"><i class="fas fa-phone mr-1"></i>+966-557385262</div>
+        <div class="print-pro">{{ site_profile.short_name }}</div>
+        <div class="print-sub-pro">{{ site_profile.name | upper }}</div>
+        <div class="print-tagline">{{ site_profile.tagline }}</div>
+        <div class="print-tagline"><i class="fas fa-phone mr-1"></i>{{ site_profile.phone }}</div>
       </div>
     </div>
 

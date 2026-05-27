@@ -1,6 +1,10 @@
 from datetime import datetime
+from pathlib import Path
 
 from flask import jsonify, request, send_file, send_from_directory
+from werkzeug.utils import secure_filename
+
+from services.site_profile import get_site_profile, save_site_profile
 
 
 def register_system_api_routes(
@@ -51,13 +55,106 @@ def register_system_api_routes(
                 status["ping_error"] = str(error)
         return jsonify(status)
 
+    @app.route('/api/site-profile', methods=['GET'])
+    @role_required(['Admin'])
+    def site_profile_detail():
+        return jsonify(get_site_profile(mongo))
+
+    @app.route('/api/site-profile', methods=['PUT'])
+    @role_required(['Admin'])
+    def update_site_profile():
+        if not check_db():
+            return jsonify({'error': 'Database error'}), 500
+        try:
+            profile = save_site_profile(mongo, request.json or {}, get_current_user_id())
+            return jsonify({'message': 'Profile updated successfully', 'profile': profile})
+        except Exception as error:
+            return jsonify({'error': str(error)}), 500
+
+    @app.route('/api/site-profile/logo', methods=['POST'])
+    @role_required(['Admin'])
+    def upload_site_logo():
+        if not check_db():
+            return jsonify({'error': 'Database error'}), 500
+
+        logo_file = request.files.get('logo')
+        if not logo_file or not logo_file.filename:
+            return jsonify({'error': 'Logo file is required'}), 400
+
+        if logo_file.mimetype and not logo_file.mimetype.startswith('image/'):
+            return jsonify({'error': 'Please upload an image file'}), 400
+
+        upload_dir = Path(app.root_path) / 'static' / 'uploads'
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
+        source_name = secure_filename(logo_file.filename)
+        suffix = Path(source_name).suffix.lower() or '.png'
+        filename = f"site-logo-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}{suffix}"
+        target = upload_dir / filename
+        logo_file.save(target)
+        if target.stat().st_size == 0:
+            target.unlink(missing_ok=True)
+            return jsonify({'error': 'Uploaded logo file is empty'}), 400
+
+        for old_file in upload_dir.glob('site-logo-*'):
+            if old_file != target:
+                try:
+                    old_file.unlink()
+                except OSError:
+                    pass
+
+        logo_url = f"/static/uploads/{filename}"
+        profile = save_site_profile(mongo, {'logo_url': logo_url}, get_current_user_id())
+        return jsonify({'message': 'Logo uploaded successfully', 'profile': profile})
+
     @app.route('/ping', methods=['GET', 'HEAD'])
     def ping():
         return '', 200
 
     @app.route('/manifest.json')
     def pwa_manifest():
-        return send_from_directory('static', 'manifest.json', mimetype='application/manifest+json')
+        profile = get_site_profile(mongo)
+        response = jsonify({
+            "name": profile["name"],
+            "short_name": profile["short_name"],
+            "description": f"{profile['tagline']} - {profile['system_name']}",
+            "start_url": "/",
+            "display": "standalone",
+            "orientation": "portrait",
+            "background_color": "#f8fbfa",
+            "theme_color": "#0f766e",
+            "lang": "en",
+            "scope": "/",
+            "icons": [
+                {
+                    "src": "/static/icons/icon-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                },
+                {
+                    "src": "/static/icons/icon-512.png",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "purpose": "any maskable"
+                }
+            ],
+            "categories": ["medical", "health", "productivity"],
+            "shortcuts": [
+                {
+                    "name": "Dashboard",
+                    "url": "/dashboard",
+                    "description": "Open dashboard"
+                },
+                {
+                    "name": "Patients",
+                    "url": "/patients",
+                    "description": "View patients"
+                }
+            ],
+        })
+        response.mimetype = 'application/manifest+json'
+        return response
 
     @app.route('/sw.js')
     def service_worker():

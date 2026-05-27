@@ -309,16 +309,16 @@ async function loadEmergencyAlerts() {
 
   const { response, data } = await window.apiFetchJson('/api/emergency');
   if (!response.ok || !Array.isArray(data)) {
-    container.innerHTML = '<div class="rounded-2xl border border-red-200 bg-red-50 px-5 py-8 text-center text-sm font-semibold text-red-600">Unable to load active alerts.</div>';
+    container.innerHTML = '<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-xs font-semibold text-red-600">Unable to load active alerts.</div>';
     return;
   }
 
   if (data.length === 0) {
     container.innerHTML = `
-      <div class="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50 px-5 py-8 text-center">
-        <i class="fas fa-circle-check text-3xl text-emerald-500"></i>
-        <p class="mt-3 text-sm font-black uppercase tracking-[0.18em] text-emerald-700">All Clear</p>
-        <p class="mt-2 text-sm font-medium text-slate-500">No active emergency alerts right now.</p>
+      <div class="rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
+        <i class="fas fa-circle-check text-xl text-emerald-500"></i>
+        <p class="mt-1 text-xs font-black uppercase tracking-[0.18em] text-emerald-700">All Clear</p>
+        <p class="mt-1 text-xs font-medium text-slate-500">No active emergency alerts right now.</p>
       </div>
     `;
     return;
@@ -327,7 +327,7 @@ async function loadEmergencyAlerts() {
   container.innerHTML = data.map((alert) => {
     const critical = alert.severity === 'critical';
     return `
-      <article class="${critical ? 'animate-pulse-red border-red-300 bg-red-50' : 'border-orange-200 bg-orange-50'} rounded-2xl border px-4 py-4 shadow-sm">
+      <article class="${critical ? 'animate-pulse-red border-red-300 bg-red-50' : 'border-orange-200 bg-orange-50'} rounded-xl border px-4 py-3 shadow-sm">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <div class="flex items-center gap-2">
@@ -1040,6 +1040,9 @@ function buildPrintableTable(type) {
 }
 
 function generatePrintableReport(mode) {
+  const siteProfile = typeof window.getSiteProfile === 'function' ? window.getSiteProfile() : {};
+  const profileName = escapeHtml(siteProfile.name || 'Pakistan Recovery Oasis');
+  const profileSystemName = escapeHtml(siteProfile.system_name || siteProfile.short_name || 'PRO');
   const dateValue = document.getElementById('report-date-picker')?.value;
   const reportDate = dateValue ? new Date(`${dateValue}T00:00:00`) : new Date();
   const sections = [];
@@ -1052,7 +1055,7 @@ function generatePrintableReport(mode) {
     <html>
       <head>
         <meta charset="utf-8" />
-        <title>PRO Daily Report</title>
+        <title>${profileSystemName} Daily Report</title>
         <style>
           @page { size: portrait; margin: 15mm; }
           body { font-family: Arial, sans-serif; color: #0f172a; padding: 24px; }
@@ -1069,7 +1072,7 @@ function generatePrintableReport(mode) {
       </head>
       <body>
         <header>
-          <h1>Pakistan Recovery Oasis</h1>
+          <h1>${profileName}</h1>
           <p>Daily Patient Activity Report</p>
         </header>
         <div class="meta">

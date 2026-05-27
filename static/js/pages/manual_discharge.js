@@ -351,6 +351,11 @@ async function printManualDischargeReceipt(id) {
   const received = parseAmount(row.received_amount);
   const gross = fee + rehabNext + testAmount + canteen + laundry + barbar + medicine + other;
   const balance = parseAmount(row.net_balance);
+  const siteProfile = typeof window.getSiteProfile === 'function' ? window.getSiteProfile() : {};
+  const safe = typeof window.escapeHtml === 'function' ? window.escapeHtml : (value) => String(value ?? '');
+  const logoMarkup = siteProfile.logo_url
+    ? `<img src="${safe(siteProfile.logo_url)}" alt="${safe(siteProfile.name || 'Logo')} logo" class="h-12 w-12 object-contain" />`
+    : '<i class="fas fa-brain text-[#0b7454]" style="font-size: 40px;"></i>';
 
   const content = document.getElementById('manual-discharge-print-content');
   if (!content) return;
@@ -358,14 +363,14 @@ async function printManualDischargeReceipt(id) {
     <div class="mx-auto max-w-2xl bg-white p-[15px] font-sans text-gray-800">
       <div class="mb-4 flex items-center justify-between">
         <div class="w-16">
-          <i class="fas fa-brain text-[#0b7454]" style="font-size: 40px;"></i>
+          ${logoMarkup}
         </div>
         <div class="flex-1 text-center">
-          <h1 class="text-[#0b7454]" style="font-size: 28px; line-height: 1; font-weight: 800; letter-spacing: 0.08em;">PRO</h1>
-          <p style="font-size: 11px;" class="font-bold tracking-wide text-gray-800">PAKISTAN RECOVERY OASIS</p>
+          <h1 class="text-[#0b7454]" style="font-size: 28px; line-height: 1; font-weight: 800; letter-spacing: 0.08em;">${safe(siteProfile.short_name || 'PRO')}</h1>
+          <p style="font-size: 11px;" class="font-bold tracking-wide text-gray-800">${safe((siteProfile.name || 'Pakistan Recovery Oasis').toUpperCase())}</p>
           <div class="mx-auto my-1 w-1/2 border-t border-gray-400"></div>
-          <p class="text-[8px] uppercase tracking-wide text-gray-600">Addiction Treatment & Psychological Services</p>
-          <p class="mt-1 text-[9px]"><i class="fas fa-phone-alt mr-1"></i>+966-557385262</p>
+          <p class="text-[8px] uppercase tracking-wide text-gray-600">${safe(siteProfile.tagline || 'Addiction Treatment & Psychological Services')}</p>
+          <p class="mt-1 text-[9px]"><i class="fas fa-phone-alt mr-1"></i>${safe(siteProfile.phone || '+966-557385262')}</p>
         </div>
         <div class="w-16"></div>
       </div>
@@ -412,7 +417,7 @@ async function printManualDischargeReceipt(id) {
         </tbody>
       </table>
       ${row.notes ? `<div class="mt-2 text-[10px] text-gray-600"><span class="font-bold">Notes:</span> ${row.notes}</div>` : ''}
-      <div class="mt-3 border-t border-gray-200 pt-2 text-center text-[9px] text-gray-500">Thank you for choosing PRO - Pakistan Recovery Oasis</div>
+      <div class="mt-3 border-t border-gray-200 pt-2 text-center text-[9px] text-gray-500">Thank you for choosing ${safe(siteProfile.name || 'Pakistan Recovery Oasis')}</div>
     </div>
   `;
 

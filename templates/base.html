@@ -3,16 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{ page_title or "PRO System" }} - PRO HMS</title>
+  <title>{{ page_title or site_profile.system_name }} - {{ site_profile.header_label }}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Manrope:wght@500;600;700;800&family=DM+Sans:wght@400;500;700;800&display=swap" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0f766e" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app-shell.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app-shell.css', v='20260528-3') }}" />
   {% block extra_styles %}{% endblock %}
   <script>
-    window.__APP__ = {{ (app_context or {}) | tojson }};
+    window.__APP__ = Object.assign(
+      { siteProfile: {{ site_profile | tojson }} },
+      {{ (app_context or {}) | tojson }}
+    );
   </script>
 </head>
 <body class="{{ body_class or 'min-h-screen bg-slate-50 text-slate-900' }}{% if app_shell %} app-shell-body{% endif %}">
@@ -43,7 +46,7 @@
 
   <script src="{{ url_for('static', filename='js/shared/ui.js') }}"></script>
   {% if app_shell %}
-  <script src="{{ url_for('static', filename='js/shared/layout.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/shared/layout.js', v='20260528-3') }}"></script>
   <script src="{{ url_for('static', filename='js/shared/password.js') }}"></script>
   {% if current_user and current_user.role == 'Admin' %}
   <script src="{{ url_for('static', filename='js/shared/payments.js') }}"></script>
