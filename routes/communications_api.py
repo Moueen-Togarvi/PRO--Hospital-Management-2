@@ -197,7 +197,14 @@ def register_communications_api_routes(
             }
             result = mongo.db.meetings.insert_one(meeting)
 
-            admin = mongo.db.users.find_one({'username': 'ImranSaab'}, {'phone': 1})
+            admin = mongo.db.users.find_one({
+                '$or': [
+                    {'is_primary_admin': True},
+                    {'username': 'ImranSaab'},
+                    {'role': 'Admin'},
+                ],
+                'deleted_at': {'$exists': False},
+            }, {'phone': 1})
             admin_phone = admin.get('phone', '') if admin else ''
             if admin_phone:
                 alert_msg = (

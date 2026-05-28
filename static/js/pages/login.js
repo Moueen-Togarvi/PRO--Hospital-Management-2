@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.showToast('Login error. Please try again.', true);
       } finally {
         loginSubmitBtn.disabled = false;
-        loginSubmitBtn.textContent = 'Login';
+        loginSubmitBtn.textContent = 'Sign In';
       }
     });
   }

@@ -21,7 +21,21 @@ class PageContext:
         self.patient_detail_roles = {"Admin", "Doctor", "Psychologist"}
         self.psych_page_roles = {"Admin", "Psychologist"}
         self.prescription_page_roles = {"Admin"}
-        self.profile_page_roles = {"Admin"}
+        self.profile_page_roles = {
+            "Admin",
+            "Reception",
+            "Doctor",
+            "Nurse",
+            "Lab",
+            "Radiology",
+            "Pharmacy",
+            "Accountant",
+            "Psychologist",
+            "Canteen",
+            "General Staff",
+            "Family",
+            "Staff",
+        }
         self.team_page_roles = {"Admin"}
         self.utility_bills_page_roles = {"Admin"}
         self.user_page_roles = {"Admin"}

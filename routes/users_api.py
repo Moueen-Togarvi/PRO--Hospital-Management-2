@@ -140,9 +140,9 @@ def register_user_api_routes(
                 "updated_at": datetime.utcnow(),
             }
 
-            if existing_user.get('username') == 'ImranSaab':
-                update_fields['username'] = existing_user.get('username')
+            if existing_user.get('username') == 'ImranSaab' or existing_user.get('is_primary_admin'):
                 update_fields['role'] = 'Admin'
+                update_fields['is_primary_admin'] = True
 
             password = data.get('password', '')
             if password:
@@ -180,7 +180,7 @@ def register_user_api_routes(
 
         try:
             user = mongo.db.users.find_one({'_id': ObjectId(id)})
-            if user and user.get('username') == 'ImranSaab':
+            if user and (user.get('username') == 'ImranSaab' or user.get('is_primary_admin')):
                 return jsonify({"error": "Main admin cannot be deleted"}), 403
 
             mongo.db.users.update_one({'_id': ObjectId(id)}, {'$set': {'deleted_at': datetime.utcnow()}})

@@ -146,7 +146,7 @@ function renderUserList() {
   }
 
   tbody.innerHTML = users.map((user) => {
-    const isMainAdmin = user.username === 'ImranSaab';
+    const isMainAdmin = user.is_primary_admin || user.username === 'ImranSaab';
     const deleteButton = isMainAdmin
       ? ''
       : `<button type="button" onclick="deleteUser('${user._id}')" class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 text-xs font-black text-red-700 hover:bg-red-100">
@@ -335,9 +335,9 @@ async function openUserModal(mode = 'create', userId = '') {
     help.textContent = 'Update user details, role, shifts, or linked patients.';
     saveButton.innerHTML = '<i class="fas fa-save text-xs"></i> Update User';
 
-    if (user.username === 'ImranSaab') {
-      document.getElementById('user-username').disabled = true;
+    if (user.is_primary_admin || user.username === 'ImranSaab') {
       document.getElementById('user-role').disabled = true;
+      help.textContent = 'Main admin username can be changed, but role stays Admin.';
     }
 
     renderUserPatientPicker(user.patient_ids || []);

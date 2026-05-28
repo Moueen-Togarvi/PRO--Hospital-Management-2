@@ -1,78 +1,79 @@
 {% extends "base.html" %}
 
 {% block extra_styles %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css', v='20260528-split-login') }}" />
 {% endblock %}
 
 {% block content %}
-<section class="login-screen relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
-  <div class="bg-pattern" id="bgPattern"></div>
-
-  <div class="relative z-10 flex w-full max-w-6xl flex-col items-center justify-center gap-8 rounded-[2rem] border border-white/20 bg-white/8 p-5 shadow-2xl backdrop-blur-2xl lg:flex-row lg:p-10">
-    <div class="flex min-w-0 flex-1 flex-col items-center justify-center text-center">
-      <div class="logo-icon-login">
-        {% if site_profile.logo_url %}
-        <img src="{{ site_profile.logo_url }}" alt="{{ site_profile.name }} logo" class="logo-img-login">
-        {% else %}
-        <i class="fas fa-brain text-5xl text-white"></i>
-        {% endif %}
+<section class="login-screen">
+  <div class="login-frame">
+    <div class="login-form-panel">
+      <div class="login-brand-row">
+        <div class="login-brand-mark">
+          {% if site_profile.logo_url %}
+          <img src="{{ site_profile.logo_url }}" alt="{{ site_profile.name }} logo">
+          {% else %}
+          <i class="fas fa-hospital"></i>
+          {% endif %}
+        </div>
+        <div>
+          <p class="login-brand-label">{{ site_profile.phase_label }}</p>
+          <p class="login-brand-name">{{ site_profile.system_name }}</p>
+        </div>
       </div>
-      <h1 class="brand-name-login">{{ site_profile.name }}</h1>
-      <p class="brand-name-login sub">{{ site_profile.tagline }}</p>
-      <div class="mt-4 h-[2px] w-48 rounded-full bg-gradient-to-r from-emerald-300 via-teal-300 to-lime-300"></div>
-      <p class="mt-6 max-w-md text-sm font-medium text-white/80">
-        {{ site_profile.phase_label }} secure access for {{ site_profile.system_name }}.
-      </p>
+
+      <div class="login-form-wrap">
+        <div class="login-copy">
+          <h1>Welcome back</h1>
+          <p>Please enter your details.</p>
+        </div>
+
+        <form id="login-form" autocomplete="off" class="login-form">
+          <div>
+            <label class="field-label-new" for="login-username">Email / Username</label>
+            <input class="form-input-new" type="text" id="login-username" name="username" placeholder="Enter your username" required />
+          </div>
+
+          <div class="login-password-field">
+            <label class="field-label-new" for="login-password">Password</label>
+            <input class="form-input-new" type="password" id="login-password" name="password" placeholder="Enter password" required />
+            <button type="button" id="toggle-password-btn" class="eye-btn-new" aria-label="Show or hide password">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+
+          <div class="login-options-row">
+            <label class="login-remember">
+              <input type="checkbox" />
+              <span>Remember for 30 days</span>
+            </label>
+            <button type="button" id="forgot-password-trigger" class="login-link-button">
+              Forgot password
+            </button>
+          </div>
+
+          <button id="login-submit-btn" class="btn-login-new" type="submit">Sign In</button>
+        </form>
+
+        <p class="login-help-text">
+          Need access? Contact admin at <span>{{ site_profile.phone }}</span>
+        </p>
+      </div>
+
+      <div class="login-footer-line">
+        <span>© {{ site_profile.system_name }}</span>
+      </div>
     </div>
 
-    <div class="hidden h-56 w-[2px] rounded-full bg-gradient-to-b from-transparent via-white/30 to-transparent lg:block"></div>
-
-    <div class="login-card-inner w-full flex-1">
-      <div class="login-title-new">Login Account</div>
-      <form id="login-form" autocomplete="off" class="space-y-5">
-        <div>
-          <label class="field-label-new" for="login-username">Email / Username</label>
-          <input class="form-input-new" type="text" id="login-username" name="username" placeholder="admin" required />
-        </div>
-
-        <div class="relative">
-          <label class="field-label-new" for="login-password">Password</label>
-          <input class="form-input-new pr-14" type="password" id="login-password" name="password" placeholder="••••••••" required />
-          <button type="button" id="toggle-password-btn" class="eye-btn-new" aria-label="Show or hide password">
-            <i class="fas fa-eye"></i>
-          </button>
-        </div>
-
-        <div class="flex justify-end">
-          <button type="button" id="forgot-password-trigger" class="text-sm font-semibold text-teal-700 transition hover:text-teal-900 hover:underline">
-            Forgot Password?
-          </button>
-        </div>
-
-        <button id="login-submit-btn" class="btn-login-new" type="submit">Login</button>
-      </form>
-
-      <div class="my-6 flex items-center gap-4">
-        <div class="h-px flex-1 bg-slate-200"></div>
-        <span class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Support</span>
-        <div class="h-px flex-1 bg-slate-200"></div>
-      </div>
-
-      <div class="space-y-3">
-        <div class="contact-item-new">
-          <div class="contact-icon-new"><i class="fas fa-phone-alt"></i></div>
-          <div>
-            <div class="contact-label">Phone</div>
-            <div class="contact-value">{{ site_profile.phone }}</div>
-          </div>
-        </div>
-        <div class="contact-item-new">
-          <div class="contact-icon-new"><i class="fas fa-envelope"></i></div>
-          <div>
-            <div class="contact-label">E-Mail</div>
-            <div class="contact-value">{{ site_profile.email }}</div>
-          </div>
-        </div>
+    <div class="login-visual-panel" aria-hidden="true">
+      <div class="visual-grid"></div>
+      <div class="visual-track visual-track-one"></div>
+      <div class="visual-track visual-track-two"></div>
+      <div class="visual-orb visual-orb-one"></div>
+      <div class="visual-orb visual-orb-two"></div>
+      <div class="visual-caption">
+        <p>{{ site_profile.name }}</p>
+        <span>{{ site_profile.tagline }}</span>
       </div>
     </div>
   </div>
@@ -131,5 +132,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-  <script src="{{ url_for('static', filename='js/pages/login.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pages/login.js', v='20260528-split-login') }}"></script>
 {% endblock %}

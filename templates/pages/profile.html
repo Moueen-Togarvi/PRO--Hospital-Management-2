@@ -5,7 +5,7 @@
   <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
     <div>
       <h2 class="text-2xl font-black text-emerald-950">Profile Settings</h2>
-      <p class="mt-1 text-sm font-semibold text-slate-500">Website, reports, receipts, and print branding</p>
+      <p class="mt-1 text-sm font-bold text-slate-700">Account login, password, and print branding</p>
     </div>
     <a href="/dashboard" class="inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50">
       <i class="fas fa-arrow-left"></i>
@@ -13,8 +13,91 @@
     </a>
   </div>
 
+  <div class="mb-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+    <div class="panel-card p-5">
+      <div class="mb-4 flex items-center gap-3">
+        <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
+          <i class="fas fa-user-shield"></i>
+        </span>
+        <div>
+          <p class="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">My Account</p>
+          <h3 class="text-xl font-black text-slate-950">Login Details</h3>
+        </div>
+      </div>
+
+      <form id="account-profile-form" class="grid gap-4 md:grid-cols-3">
+        <label class="block">
+          <span class="app-field-label">Display Name</span>
+          <input id="account-name" class="app-field" maxlength="100" required />
+        </label>
+        <label class="block">
+          <span class="app-field-label">Username</span>
+          <input id="account-username" class="app-field" maxlength="80" autocomplete="username" required />
+        </label>
+        <label class="block">
+          <span class="app-field-label">Email</span>
+          <input id="account-email" type="email" class="app-field" maxlength="120" autocomplete="email" required />
+        </label>
+        <div class="md:col-span-3 flex justify-end">
+          <button id="account-save-button" class="app-primary-btn" type="submit">
+            <i class="fas fa-save"></i>
+            <span>Save Account</span>
+          </button>
+        </div>
+      </form>
+
+      <form id="account-password-form" class="mt-5 grid gap-4 border-t border-slate-200 pt-5 md:grid-cols-3">
+        <label class="block">
+          <span class="app-field-label">Current Password</span>
+          <input id="account-current-password" type="password" class="app-field" autocomplete="current-password" />
+        </label>
+        <label class="block">
+          <span class="app-field-label">New Password</span>
+          <input id="account-new-password" type="password" class="app-field" autocomplete="new-password" minlength="6" />
+        </label>
+        <label class="block">
+          <span class="app-field-label">Confirm Password</span>
+          <input id="account-confirm-password" type="password" class="app-field" autocomplete="new-password" minlength="6" />
+        </label>
+        <div class="md:col-span-3 flex justify-end">
+          <button id="account-password-button" class="inline-flex items-center justify-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-indigo-700 shadow-sm transition hover:bg-indigo-100" type="submit">
+            <i class="fas fa-key"></i>
+            <span>Update Password</span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <aside class="panel-card p-5">
+      <div class="flex h-full flex-col justify-center">
+        <div class="flex items-center gap-3">
+          <span id="account-avatar-initial" class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-700 text-2xl font-black text-white">U</span>
+          <div class="min-w-0">
+            <p id="account-preview-role" class="text-xs font-black uppercase tracking-[0.16em] text-emerald-700"></p>
+            <h3 id="account-preview-name" class="truncate text-lg font-black text-slate-950"></h3>
+          </div>
+        </div>
+        <div class="mt-5 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-900">
+          <div class="flex min-w-0 items-center gap-2">
+            <i class="fas fa-at w-4 text-slate-600"></i>
+            <span id="account-preview-username" class="truncate"></span>
+          </div>
+          <div class="flex min-w-0 items-center gap-2">
+            <i class="fas fa-envelope w-4 text-slate-600"></i>
+            <span id="account-preview-email" class="truncate"></span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  {% if current_user and current_user.role == 'Admin' %}
   <form id="site-profile-form" class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
     <div class="panel-card p-5">
+      <div class="mb-4">
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Organization</p>
+        <h3 class="text-xl font-black text-slate-950">Branding & Print Details</h3>
+      </div>
       <div class="grid gap-4 md:grid-cols-2">
         <label class="block">
           <span class="app-field-label">Organization Name</span>
@@ -54,14 +137,10 @@
         </label>
       </div>
 
-      <div class="mt-6 flex flex-col gap-3 border-t border-emerald-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-        <button id="password-button" class="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100" type="button">
-          <i class="fas fa-key"></i>
-          <span>Password</span>
-        </button>
+      <div class="mt-6 flex justify-end border-t border-emerald-100 pt-5">
         <button id="profile-save-button" class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700" type="submit">
           <i class="fas fa-save"></i>
-          <span>Save Profile</span>
+          <span>Save Branding</span>
         </button>
       </div>
     </div>
@@ -97,9 +176,10 @@
       </div>
     </aside>
   </form>
+  {% endif %}
 </section>
 {% endblock %}
 
 {% block extra_scripts %}
-  <script src="{{ url_for('static', filename='js/pages/profile.js', v='20260528-profile-fields') }}"></script>
+  <script src="{{ url_for('static', filename='js/pages/profile.js', v='20260528-account-profile') }}"></script>
 {% endblock %}

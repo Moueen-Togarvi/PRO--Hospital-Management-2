@@ -24,6 +24,15 @@ def register_auth_api_routes(
 ):
     otp_store = {}
 
+    def serialize_account_user(user):
+        return {
+            "user_id": str(user.get("_id", "")),
+            "username": user.get("username", ""),
+            "name": user.get("name") or user.get("username", ""),
+            "email": user.get("email", ""),
+            "role": user.get("role", ""),
+        }
+
     @app.route('/api/auth/login', methods=['POST'])
     @limiter.limit("5 per minute")
     def login():
@@ -36,7 +45,14 @@ def register_auth_api_routes(
         if not username or not password:
             return jsonify({"error": "Username and password are required"}), 400
 
-        user = mongo.db.users.find_one({"username": username, "deleted_at": {"$exists": False}})
+        normalized_login_email = normalize_email(username)
+        user = mongo.db.users.find_one({
+            "$or": [
+                {"username": username},
+                {"email": normalized_login_email},
+            ],
+            "deleted_at": {"$exists": False},
+        })
 
         if user and user.get('password') and check_password_hash(user['password'], password):
             user_id = str(user['_id'])
@@ -207,6 +223,100 @@ def register_auth_api_routes(
                 "user_id": session.get('user_id')
             })
         return jsonify({"is_logged_in": False})
+
+    @app.route('/api/auth/profile', methods=['GET'])
+    @login_required
+    def get_account_profile():
+        if not check_db():
+            return jsonify({"error": "Database error"}), 500
+
+        user_id = get_current_user_id()
+        try:
+            user = mongo.db.users.find_one({
+                "_id": ObjectId(user_id),
+                "deleted_at": {"$exists": False},
+            })
+        except Exception:
+            user = None
+
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        return jsonify({"profile": serialize_account_user(user)})
+
+    @app.route('/api/auth/profile', methods=['PUT'])
+    @login_required
+    def update_account_profile():
+        if not check_db():
+            return jsonify({"error": "Database error"}), 500
+
+        data = clean_input_data(request.get_json(silent=True) or {})
+        user_id = get_current_user_id()
+
+        try:
+            user_object_id = ObjectId(user_id)
+            user = mongo.db.users.find_one({
+                "_id": user_object_id,
+                "deleted_at": {"$exists": False},
+            })
+        except Exception:
+            user = None
+
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        username = (data.get("username") or "").strip()
+        name = (data.get("name") or username).strip()
+        email = normalize_email(data.get("email"))
+        current_password = data.get("current_password") or ""
+        new_password = data.get("new_password") or ""
+
+        if not username or not name or not email:
+            return jsonify({"error": "Name, username, and email are required"}), 400
+
+        duplicate_username = mongo.db.users.find_one({
+            "_id": {"$ne": user_object_id},
+            "username": username,
+            "deleted_at": {"$exists": False},
+        })
+        if duplicate_username:
+            return jsonify({"error": "Username already exists"}), 409
+
+        duplicate_email = mongo.db.users.find_one({
+            "_id": {"$ne": user_object_id},
+            "email": email,
+            "deleted_at": {"$exists": False},
+        })
+        if duplicate_email:
+            return jsonify({"error": "Email already exists"}), 409
+
+        update_fields = {
+            "username": username,
+            "name": name,
+            "email": email,
+            "updated_at": datetime.utcnow(),
+        }
+
+        if user.get("username") == "ImranSaab" or user.get("is_primary_admin"):
+            update_fields["is_primary_admin"] = True
+
+        if new_password:
+            if len(new_password) < 6:
+                return jsonify({"error": "New password must be at least 6 characters"}), 400
+            if not current_password:
+                return jsonify({"error": "Current password is required to change password"}), 400
+            if not user.get("password") or not check_password_hash(user["password"], current_password):
+                return jsonify({"error": "Current password is incorrect"}), 401
+            update_fields["password"] = generate_password_hash(new_password)
+
+        mongo.db.users.update_one({"_id": user_object_id}, {"$set": update_fields})
+        updated_user = mongo.db.users.find_one({"_id": user_object_id})
+        session["username"] = updated_user.get("username", username)
+        session["role"] = updated_user.get("role", session.get("role"))
+        return jsonify({
+            "message": "Account updated successfully",
+            "profile": serialize_account_user(updated_user),
+        })
 
     @app.route('/api/users/change_password', methods=['POST'])
     @login_required
