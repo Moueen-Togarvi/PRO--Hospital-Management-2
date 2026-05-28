@@ -2,6 +2,7 @@ async function renderAttendanceTable(targetMonthValue) {
   const headerRow = document.getElementById('attendance-header-row');
   const tbody = document.getElementById('attendance-table-body');
   const monthInput = document.getElementById('attendance-month');
+  const monthLabel = document.getElementById('attendance-month-label');
 
   if (!headerRow || !tbody) return;
 
@@ -14,10 +15,12 @@ async function renderAttendanceTable(targetMonthValue) {
   const year = baseDate.getFullYear();
   const month = baseDate.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthName = baseDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   if (monthInput && !monthInput.value) {
     monthInput.value = `${year}-${String(month + 1).padStart(2, '0')}`;
   }
+  if (monthLabel) monthLabel.textContent = `${monthName} - ${daysInMonth} days`;
 
   let employees = [];
   try {
@@ -35,38 +38,41 @@ async function renderAttendanceTable(targetMonthValue) {
     console.error('Attendance fetch failed', error);
   }
 
+  const stats = { P: 0, A: 0, H: 0 };
+
   let headerHTML = `
-    <th class="sticky left-0 w-48 bg-emerald-600 px-4 py-2 text-white">Employee</th>
+    <th class="w-[10rem] bg-slate-800 px-3 py-3 text-left text-[10px] font-black uppercase tracking-[0.1em] text-white">Employee</th>
   `;
   for (let day = 1; day <= daysInMonth; day += 1) {
-    headerHTML += `<th class="border-l border-emerald-500 bg-emerald-600 px-2 py-2 text-center text-white">${day}</th>`;
+    headerHTML += `<th class="border-l border-slate-700 bg-slate-800 px-0.5 py-3 text-center text-[10px] font-black text-white">${day}</th>`;
   }
   headerRow.innerHTML = headerHTML;
 
   tbody.innerHTML = '';
   employees.forEach((employee) => {
     const row = document.createElement('tr');
-    row.className = 'hover:bg-gray-50';
+    row.className = 'bg-white hover:bg-emerald-50/30';
 
     let rowHTML = `
-      <td class="sticky left-0 bg-gray-100 px-3 py-2 font-semibold">
+      <td class="w-[10rem] truncate border-r border-slate-100 bg-white px-3 py-3 text-xs font-black text-slate-950" title="${employee.name}">
         ${employee.name}
       </td>
     `;
 
     for (let day = 1; day <= daysInMonth; day += 1) {
       const mark = attendance[employee.id]?.[String(day)] || '';
-      const color = mark === 'P'
-        ? 'bg-green-200'
+      if (stats[mark] !== undefined) stats[mark] += 1;
+      const cellClass = mark === 'P'
+        ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
         : mark === 'A'
-          ? 'bg-red-200'
+          ? 'border-red-100 bg-red-50 text-red-700'
           : mark === 'H'
-            ? 'bg-yellow-200'
-            : '';
+            ? 'border-amber-100 bg-amber-50 text-amber-700'
+            : 'border-slate-100 bg-white text-slate-300 hover:bg-slate-50';
 
       rowHTML += `
-        <td class="cursor-pointer border text-center ${color}" data-emp="${employee.id}" data-day="${day}">
-          ${mark === 'P' ? '✔️' : mark === 'A' ? '❌' : mark === 'H' ? '🕐' : ''}
+        <td class="h-9 cursor-pointer border px-0.5 py-1 text-center text-[10px] font-black transition ${cellClass}" data-emp="${employee.id}" data-day="${day}" title="${employee.name} - Day ${day}">
+          ${mark || ''}
         </td>
       `;
     }
@@ -81,20 +87,27 @@ async function renderAttendanceTable(targetMonthValue) {
       const day = cell.dataset.day;
 
       const current = cell.textContent.trim();
-      const mark = current === '' ? 'P' : current === '✔️' ? 'A' : current === '❌' ? 'H' : '';
-
-      cell.textContent = mark === 'P' ? '✔️' : mark === 'A' ? '❌' : mark === 'H' ? '🕐' : '';
-      cell.classList.toggle('bg-green-200', mark === 'P');
-      cell.classList.toggle('bg-red-200', mark === 'A');
-      cell.classList.toggle('bg-yellow-200', mark === 'H');
+      const mark = current === '' ? 'P' : current === 'P' ? 'A' : current === 'A' ? 'H' : '';
 
       await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ empId, day, year, month: month + 1, mark }),
       });
+
+      await renderAttendanceTable(monthInput ? monthInput.value : undefined);
     };
   });
+
+  const setStat = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = String(value);
+  };
+
+  setStat('attendance-staff-count', employees.length);
+  setStat('attendance-present-count', stats.P);
+  setStat('attendance-absent-count', stats.A);
+  setStat('attendance-half-count', stats.H);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

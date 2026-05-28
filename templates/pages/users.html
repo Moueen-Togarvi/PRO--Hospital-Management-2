@@ -1,17 +1,58 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section id="user-management-view" class="view-section -mx-4 -my-5 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
-  <h2 class="mb-6 text-2xl font-bold">User Management</h2>
-  <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-    <div class="col-span-1 rounded bg-white p-6 shadow">
-      <h3 class="mb-4 font-bold">Create User</h3>
-      <form onsubmit="createUser(event)">
-        <input name="new-name" class="mb-2 w-full rounded border p-2" placeholder="Name" required />
-        <input name="new-username" class="mb-2 w-full rounded border p-2" placeholder="Username" required />
-        <input name="new-email" type="email" class="mb-2 w-full rounded border p-2" placeholder="Email" required />
-        <input name="new-password" type="password" class="mb-2 w-full rounded border p-2" placeholder="Password" required />
-        <select name="new-role" class="mb-2 w-full rounded border p-2" id="new-user-role" onchange="togglePatientSelect()">
+<section id="user-management-view" class="view-section -mx-4 -my-5 bg-[#f6fbf8] px-4 py-5 md:-mx-8 md:-my-8 md:px-8">
+  <div class="mx-auto w-full max-w-7xl space-y-4">
+    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div class="flex flex-col gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-emerald-50 px-5 py-2 lg:flex-row lg:items-center lg:justify-between">
+        <div class="flex items-center gap-2">
+          <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-sm text-white shadow-lg shadow-slate-200">
+            <i class="fas fa-users-cog"></i>
+          </span>
+          <div>
+            <p class="text-[9px] font-black uppercase leading-none tracking-[0.18em] text-emerald-700">Admin Controls</p>
+            <h2 class="mt-0.5 text-xl font-black leading-tight text-slate-950">User Management</h2>
+            <p class="text-xs font-semibold leading-tight text-slate-600">Create, edit, assign patients, and manage staff access.</p>
+          </div>
+        </div>
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <button type="button" onclick="renderUserManagement()" class="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50">
+            <i class="fas fa-sync-alt text-xs text-slate-500"></i>
+            Refresh
+          </button>
+          <button type="button" onclick="openUserModal('create')" class="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white shadow-lg shadow-emerald-100 hover:bg-emerald-800">
+            <i class="fas fa-plus-circle text-xs"></i>
+            Add User
+          </button>
+        </div>
+      </div>
+
+      <div class="grid gap-3 border-b border-slate-100 px-4 py-2 md:grid-cols-4">
+        <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2">
+          <p class="text-[10px] font-black uppercase leading-none tracking-[0.14em] text-slate-600">Total Users</p>
+          <p id="user-stat-total" class="mt-1 text-xl font-black leading-none text-slate-950">0</p>
+        </div>
+        <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2">
+          <p class="text-[10px] font-black uppercase leading-none tracking-[0.14em] text-blue-700">Admins</p>
+          <p id="user-stat-admin" class="mt-1 text-xl font-black leading-none text-blue-800">0</p>
+        </div>
+        <div class="rounded-xl border border-amber-100 bg-amber-50 px-4 py-2">
+          <p class="text-[10px] font-black uppercase leading-none tracking-[0.14em] text-amber-700">Staff</p>
+          <p id="user-stat-staff" class="mt-1 text-xl font-black leading-none text-amber-800">0</p>
+        </div>
+        <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2">
+          <p class="text-[10px] font-black uppercase leading-none tracking-[0.14em] text-emerald-700">Family</p>
+          <p id="user-stat-family" class="mt-1 text-xl font-black leading-none text-emerald-800">0</p>
+        </div>
+      </div>
+
+      <div class="grid gap-3 border-b border-slate-100 px-4 py-2 lg:grid-cols-[minmax(0,1fr)_14rem]">
+        <label class="relative">
+          <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400"></i>
+          <input id="user-search" type="search" oninput="renderUserList()" class="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm font-bold text-slate-800 outline-none focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100" placeholder="Search name, username, email..." />
+        </label>
+        <select id="user-role-filter" onchange="renderUserList()" class="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-800 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100">
+          <option value="">All Roles</option>
           <option value="Admin">Admin</option>
           <option value="Doctor">Doctor</option>
           <option value="Psychologist">Psychologist</option>
@@ -19,67 +60,120 @@
           <option value="General Staff">General Staff</option>
           <option value="Family">Family</option>
         </select>
+      </div>
 
-        <div id="new-user-patients-group" class="mb-4 hidden">
-          <label class="mb-1 block text-[10px] font-bold uppercase text-gray-400">Assign Patients</label>
-          <div id="new-user-patients-list" class="max-h-40 space-y-1 overflow-y-auto rounded border bg-gray-50 p-2">
-          </div>
-        </div>
-        <button class="w-full rounded bg-blue-600 p-2 font-semibold text-white shadow-md transition hover:bg-blue-700">
-          Create
-        </button>
-      </form>
-    </div>
-
-    <div class="kpi-card col-span-2" style="padding: 0; border-color: rgba(16, 185, 129, 0.2)">
-      <div class="table-scroll-shell w-full overflow-x-auto" style="--table-scroll-max-height: 24rem;">
-        <table class="min-w-full divide-y divide-emerald-100">
-          <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-100">
+          <thead class="bg-slate-900 text-white">
             <tr>
-              <th class="whitespace-nowrap px-6 py-3 text-left font-semibold">Name</th>
-              <th class="whitespace-nowrap px-6 py-3 text-left font-semibold">User</th>
-              <th class="whitespace-nowrap px-6 py-3 text-left font-semibold">Role</th>
-              <th class="whitespace-nowrap px-6 py-3 text-center font-semibold">Shift (D/N)</th>
-              <th class="whitespace-nowrap px-6 py-3 text-center font-semibold">Action</th>
+              <th class="whitespace-nowrap px-5 py-3 text-left text-[11px] font-black uppercase tracking-[0.12em]">User</th>
+              <th class="whitespace-nowrap px-5 py-3 text-left text-[11px] font-black uppercase tracking-[0.12em]">Role</th>
+              <th class="whitespace-nowrap px-5 py-3 text-center text-[11px] font-black uppercase tracking-[0.12em]">Shift</th>
+              <th class="whitespace-nowrap px-5 py-3 text-left text-[11px] font-black uppercase tracking-[0.12em]">Patients</th>
+              <th class="whitespace-nowrap px-5 py-3 text-right text-[11px] font-black uppercase tracking-[0.12em]">Actions</th>
             </tr>
           </thead>
-          <tbody id="user-table-body" class="divide-y divide-emerald-50"></tbody>
+          <tbody id="user-table-body" class="divide-y divide-slate-100 bg-white"></tbody>
         </table>
       </div>
     </div>
   </div>
 </section>
 
-<div id="user-link-patients-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900 bg-opacity-50">
-  <div class="mx-4 w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-    <div class="mb-4 flex items-start justify-between">
+<div id="user-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4">
+  <div class="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div class="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50 px-5 py-4">
       <div>
-        <h3 class="text-xl font-bold text-gray-900">Manage Patient Links</h3>
-        <p class="text-sm text-gray-600">Select patients this user can see in their portal.</p>
+        <p id="user-modal-kicker" class="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">New User</p>
+        <h3 id="user-modal-title" class="mt-0.5 text-xl font-black text-slate-950">Add User</h3>
+        <p id="user-modal-help" class="text-sm font-semibold text-slate-600">Fill user details and save access.</p>
       </div>
-      <button onclick="closeUserLinkModal()" class="text-gray-400 hover:text-gray-600">
-        <i class="fas fa-times text-lg"></i>
+      <button type="button" onclick="closeUserModal()" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100">
+        <i class="fas fa-times"></i>
       </button>
     </div>
 
-    <input type="hidden" id="link-user-id" />
-    <div class="mb-4">
-      <input type="text" id="link-patient-search" placeholder="Search patients..." class="mb-2 w-full rounded border px-3 py-2" onkeyup="filterLinkPatients()" />
-      <div id="link-patients-list" class="max-h-60 space-y-1 overflow-y-auto rounded border bg-gray-50 p-2"></div>
-    </div>
+    <form id="user-form" class="grid max-h-[75vh] gap-4 overflow-y-auto p-5" onsubmit="saveUser(event)">
+      <input type="hidden" id="user-form-id" />
 
-    <div class="flex gap-3 pt-2">
-      <button onclick="saveUserPatientLinks()" class="flex-1 rounded bg-emerald-600 py-2 font-semibold text-white transition hover:bg-emerald-700">
-        Save Links
-      </button>
-      <button type="button" onclick="closeUserLinkModal()" class="flex-1 rounded bg-gray-100 py-2 font-semibold text-gray-700 transition hover:bg-gray-200">
-        Cancel
-      </button>
-    </div>
+      <div class="grid gap-3 md:grid-cols-2">
+        <label class="grid gap-1">
+          <span class="text-[11px] font-black uppercase tracking-[0.12em] text-slate-700">Name</span>
+          <input id="user-name" class="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100" placeholder="Full name" required />
+        </label>
+        <label class="grid gap-1">
+          <span class="text-[11px] font-black uppercase tracking-[0.12em] text-slate-700">Username</span>
+          <input id="user-username" class="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100" placeholder="login username" required />
+        </label>
+        <label class="grid gap-1">
+          <span class="text-[11px] font-black uppercase tracking-[0.12em] text-slate-700">Email</span>
+          <input id="user-email" type="email" class="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100" placeholder="email@example.com" required />
+        </label>
+        <label class="grid gap-1">
+          <span class="text-[11px] font-black uppercase tracking-[0.12em] text-slate-700">Password</span>
+          <input id="user-password" type="password" class="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100" placeholder="Password" />
+          <span id="user-password-note" class="text-xs font-semibold text-slate-600">Required for new users.</span>
+        </label>
+      </div>
+
+      <label class="grid gap-1">
+        <span class="text-[11px] font-black uppercase tracking-[0.12em] text-slate-700">Role</span>
+        <select id="user-role" onchange="handleUserRoleChange()" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-900 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100">
+          <option value="Admin">Admin</option>
+          <option value="Doctor">Doctor</option>
+          <option value="Psychologist">Psychologist</option>
+          <option value="Canteen">Canteen</option>
+          <option value="General Staff">General Staff</option>
+          <option value="Family">Family</option>
+        </select>
+      </label>
+
+      <div id="user-shift-group" class="hidden rounded-xl border border-amber-100 bg-amber-50 p-3">
+        <p class="mb-2 text-[11px] font-black uppercase tracking-[0.12em] text-amber-800">Staff Shift</p>
+        <div class="grid gap-2 sm:grid-cols-2">
+          <label class="flex cursor-pointer items-center justify-between rounded-lg border border-amber-100 bg-white px-3 py-2 text-sm font-black text-slate-800">
+            <span>Day Shift</span>
+            <input id="user-day-shift" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+          </label>
+          <label class="flex cursor-pointer items-center justify-between rounded-lg border border-amber-100 bg-white px-3 py-2 text-sm font-black text-slate-800">
+            <span>Night Shift</span>
+            <input id="user-night-shift" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+          </label>
+        </div>
+      </div>
+
+      <div id="user-patients-group" class="hidden rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+        <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="text-[11px] font-black uppercase tracking-[0.12em] text-emerald-800">Assign Patients</p>
+            <p id="user-patient-count" class="text-xs font-semibold text-slate-700">0 selected</p>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" onclick="setVisibleUserPatients(true)" class="h-8 rounded-lg border border-emerald-200 bg-white px-3 text-xs font-black text-emerald-800 hover:bg-emerald-100">Select Shown</button>
+            <button type="button" onclick="setVisibleUserPatients(false)" class="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 hover:bg-slate-100">Clear Shown</button>
+          </div>
+        </div>
+        <label class="relative mb-2 block">
+          <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
+          <input id="user-patient-search" type="search" oninput="renderUserPatientPicker()" class="h-10 w-full rounded-xl border border-emerald-100 bg-white pl-9 pr-3 text-sm font-bold text-slate-800 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" placeholder="Search patients..." />
+        </label>
+        <div id="user-patients-list" class="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-emerald-100 bg-white p-2"></div>
+      </div>
+
+      <div class="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+        <button type="button" onclick="closeUserModal()" class="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 hover:bg-slate-50">
+          Cancel
+        </button>
+        <button id="user-save-button" type="submit" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white shadow-lg shadow-emerald-100 hover:bg-emerald-800">
+          <i class="fas fa-save text-xs"></i>
+          Save User
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
-  <script src="{{ url_for('static', filename='js/pages/users.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pages/users.js', v='20260528-user-modal-crud') }}"></script>
 {% endblock %}

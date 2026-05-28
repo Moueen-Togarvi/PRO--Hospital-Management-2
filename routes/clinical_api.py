@@ -259,6 +259,67 @@ def register_clinical_api_routes(
             print(f"Psych session create error: {error}")
             return jsonify({"error": str(error)}), 500
 
+    @app.route('/api/psych-sessions/<session_id>', methods=['PUT'])
+    @role_required(['Admin'])
+    def update_psych_session(session_id):
+        if not check_db():
+            return jsonify({"error": "Database error"}), 500
+        if not ObjectId.is_valid(session_id):
+            return jsonify({"error": "Invalid session"}), 400
+
+        data = clean_input_data(request.json)
+        date_str = data.get('date')
+        time_slot = data.get('time_slot', '')
+        psychologist_id = data.get('psychologist_id')
+        patient_ids = data.get('patient_ids', []) or []
+        title = data.get('title', '')
+
+        if not (date_str and psychologist_id and patient_ids):
+            return jsonify({"error": "Missing fields"}), 400
+
+        date_val = _parse_iso_date(date_str)
+        if not date_val:
+            return jsonify({"error": "Invalid date"}), 400
+
+        date_val = date_val.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        try:
+            result = mongo.db.psych_sessions.update_one(
+                {'_id': ObjectId(session_id)},
+                {'$set': {
+                    'psychologist_id': psychologist_id,
+                    'date': date_val,
+                    'time_slot': time_slot,
+                    'patient_ids': patient_ids,
+                    'title': title,
+                    'updated_by': session.get('username'),
+                    'updated_at': datetime.now()
+                }}
+            )
+            if result.matched_count == 0:
+                return jsonify({"error": "Session not found"}), 404
+            return jsonify({"message": "Session updated"})
+        except Exception as error:
+            print(f"Psych session update error: {error}")
+            return jsonify({"error": str(error)}), 500
+
+    @app.route('/api/psych-sessions/<session_id>', methods=['DELETE'])
+    @role_required(['Admin'])
+    def delete_psych_session(session_id):
+        if not check_db():
+            return jsonify({"error": "Database error"}), 500
+        if not ObjectId.is_valid(session_id):
+            return jsonify({"error": "Invalid session"}), 400
+
+        try:
+            result = mongo.db.psych_sessions.delete_one({'_id': ObjectId(session_id)})
+            if result.deleted_count == 0:
+                return jsonify({"error": "Session not found"}), 404
+            return jsonify({"message": "Session deleted"})
+        except Exception as error:
+            print(f"Psych session delete error: {error}")
+            return jsonify({"error": str(error)}), 500
+
     @app.route('/api/psych-sessions/<session_id>/note', methods=['POST'])
     @role_required(['Admin', 'Psychologist'])
     def add_psych_session_note(session_id):
@@ -282,7 +343,7 @@ def register_clinical_api_routes(
             if not session_doc:
                 return jsonify({"error": "Session not found"}), 404
 
-            if session_doc.get('note'):
+            if session_doc.get('note') and session.get('role') != 'Admin':
                 return jsonify({"error": "Note already saved"}), 409
 
             mongo.db.psych_sessions.update_one(

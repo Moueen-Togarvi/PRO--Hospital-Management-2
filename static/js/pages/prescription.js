@@ -69,24 +69,24 @@ function addMedicationRow() {
   const container = document.getElementById('medication-rows-container');
   const rowId = Date.now();
   const div = document.createElement('div');
-  div.className = 'med-row mb-2 grid grid-cols-12 items-start gap-2';
+  div.className = 'med-row mb-2 grid grid-cols-12 items-center gap-2';
   div.id = `med-row-${rowId}`;
 
   div.innerHTML = `
     <div class="col-span-4">
-      <input class="med-name w-full rounded border p-2 text-sm" placeholder="Medicine Name">
+      <input class="med-name h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-bold text-slate-800 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100" placeholder="Medicine">
     </div>
     <div class="col-span-3">
-      <input class="med-dosage w-full rounded border p-2 text-sm" placeholder="Dosage (e.g. 1+0+1)">
+      <input class="med-dosage h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-bold text-slate-800 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100" placeholder="1+0+1">
     </div>
     <div class="col-span-2">
-      <input class="med-freq w-full rounded border p-2 text-sm" placeholder="Days">
+      <input class="med-freq h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-bold text-slate-800 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100" placeholder="Days">
     </div>
     <div class="col-span-2">
-      <input class="med-instr w-full rounded border p-2 text-sm" placeholder="Instruction">
+      <input class="med-instr h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-bold text-slate-800 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100" placeholder="After meal">
     </div>
-    <div class="col-span-1 pt-1 text-center">
-      <button type="button" onclick="document.getElementById('med-row-${rowId}').remove()" class="text-red-500 hover:text-red-700">
+    <div class="col-span-1 text-center">
+      <button type="button" onclick="document.getElementById('med-row-${rowId}').remove()" class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100">
         <i class="fas fa-trash"></i>
       </button>
     </div>

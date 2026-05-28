@@ -2,17 +2,17 @@
 
 {% block content %}
 <section id="overheads-view" class="view-section -mx-4 -my-5 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
-  <div class="mb-8">
-    <div class="mb-6 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+  <div class="mb-4">
+    <div class="mb-3 flex flex-col items-start justify-between gap-2 md:flex-row md:items-center">
       <div>
-        <h2 class="text-2xl font-bold text-green-900">
+        <h2 class="text-xl font-bold leading-tight text-green-900">
           <i class="fas fa-coins mr-2"></i>Overheads & Finance
         </h2>
-        <p class="text-sm text-gray-500">Monthly financial projection: Expected Incoming Fees vs. Estimated Costs.</p>
+        <p class="text-xs font-semibold leading-tight text-gray-600">Monthly financial projection: Expected Incoming Fees vs. Estimated Costs.</p>
       </div>
 
-      <div class="flex items-center gap-2 rounded-lg border border-emerald-100 bg-white p-2 shadow-sm">
-        <select id="finance-month-select" class="rounded border px-3 py-2 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500">
+      <div class="flex items-center gap-2 rounded-lg border border-emerald-100 bg-white p-1.5 shadow-sm">
+        <select id="finance-month-select" class="rounded border px-3 py-1.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500">
           <option value="1">January</option>
           <option value="2">February</option>
           <option value="3">March</option>
@@ -26,32 +26,32 @@
           <option value="11">November</option>
           <option value="12">December</option>
         </select>
-        <select id="finance-year-select" class="rounded border px-3 py-2 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500"></select>
-        <button onclick="renderOverheads()" class="rounded bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
+        <select id="finance-year-select" class="rounded border px-3 py-1.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500"></select>
+        <button onclick="renderOverheads()" class="rounded bg-emerald-600 px-4 py-1.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
           <i class="fas fa-sync-alt mr-1"></i> Load
         </button>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-      <div class="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-5 shadow-sm">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div class="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 shadow-sm">
         <div class="z-10">
           <span class="text-xs font-bold uppercase tracking-wide text-emerald-600"><i class="fas fa-arrow-down mr-1"></i> Total Expected Incoming</span>
-          <div class="mt-2 flex items-baseline gap-2">
-            <span id="overhead-total-income" class="text-3xl font-extrabold text-emerald-700">PKR 0</span>
+          <div class="mt-1 flex items-baseline gap-2">
+            <span id="overhead-total-income" class="text-2xl font-extrabold leading-none text-emerald-700">PKR 0</span>
             <span class="text-xs font-medium text-emerald-600 opacity-80">(Fees from Active Patients)</span>
           </div>
         </div>
         <div class="pointer-events-none absolute right-0 top-0 h-full w-24 bg-gradient-to-l from-emerald-100/50 to-transparent"></div>
       </div>
 
-      <div class="relative overflow-hidden rounded-xl border border-red-200 bg-red-50 px-6 py-5 shadow-sm">
+      <div class="relative overflow-hidden rounded-xl border border-red-200 bg-red-50 px-5 py-2.5 shadow-sm">
         <div class="z-10">
           <span class="text-xs font-bold uppercase tracking-wide text-red-600"><i class="fas fa-arrow-up mr-1"></i> Total Estimated Overheads</span>
-          <div class="mt-2 flex items-baseline gap-2">
-            <span id="grand-overhead-total" class="text-3xl font-extrabold text-red-700">PKR 0</span>
+          <div class="mt-1 flex items-baseline gap-2">
+            <span id="grand-overhead-total" class="text-2xl font-extrabold leading-none text-red-700">PKR 0</span>
           </div>
-          <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border border-red-100 bg-red-100/30 p-2 text-[10px] font-medium uppercase tracking-tight text-red-600/80">
+          <div class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-0.5 rounded-lg border border-red-100 bg-red-100/30 px-2 py-1 text-[10px] font-bold uppercase tracking-tight text-red-700">
             <div class="flex justify-between border-b border-red-100 pb-0.5"><span>Salaries:</span> <span id="total-salary-display" class="font-bold">0</span></div>
             <div class="flex justify-between border-b border-red-100 pb-0.5"><span>Bills:</span> <span id="total-bills-display" class="font-bold">0</span></div>
             <div class="flex justify-between border-b border-red-100 pb-0.5"><span>Kitchen:</span> <span id="total-kitchen-display" class="font-bold">0</span></div>

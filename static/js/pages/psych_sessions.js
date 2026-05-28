@@ -2,6 +2,7 @@ const currentUser = window.__APP__?.currentUser || { role: 'Guest' };
 let psychSessions = [];
 let psychNoteSessionId = '';
 let psychPatientsData = [];
+let psychEditingSessionId = '';
 
 function escapeHtml(value = '') {
   return String(value)
@@ -18,6 +19,37 @@ function showSuccessModal(message, isError = false) {
     return;
   }
   window.alert(message);
+}
+
+function formatSessionDate(value = '') {
+  if (!value) return 'No date';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function updatePsychSessionStats() {
+  const total = psychSessions.length;
+  const saved = psychSessions.filter((session) => Boolean(session.note)).length;
+  const pending = Math.max(total - saved, 0);
+
+  const setText = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = String(value);
+  };
+
+  setText('psych-total-count', total);
+  setText('psych-pending-count', pending);
+  setText('psych-saved-count', saved);
+}
+
+function renderSessionState(message, tone = 'slate') {
+  const container = document.getElementById('psych-sessions-body');
+  if (!container) return;
+  const toneClass = tone === 'red'
+    ? 'border-red-100 bg-red-50 text-red-700'
+    : 'border-slate-100 bg-slate-50 text-slate-500';
+  container.innerHTML = `<div class="rounded-xl border ${toneClass} p-6 text-center text-sm font-bold">${escapeHtml(message)}</div>`;
 }
 
 async function fetchPatients() {
@@ -56,6 +88,104 @@ async function populatePsychPatients() {
   select.innerHTML = activePatients
     .map((patient) => `<option value="${patient._id || patient.id}">${escapeHtml(patient.name)}</option>`)
     .join('');
+  renderPsychPatientOptions();
+  updateSelectedPatientsCount();
+}
+
+function getVisiblePatientOptions() {
+  const select = document.getElementById('psych-session-patients');
+  const searchValue = document.getElementById('psych-patient-search')?.value.trim().toLowerCase() || '';
+  if (!select) return [];
+  return Array.from(select.options).filter((option) => (
+    !searchValue || option.textContent.toLowerCase().includes(searchValue)
+  ));
+}
+
+function renderPsychPatientOptions() {
+  const container = document.getElementById('psych-patient-options');
+  const visibleOptions = getVisiblePatientOptions();
+  if (!container) return;
+
+  if (visibleOptions.length === 0) {
+    container.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-center text-xs font-bold text-slate-500">No patients found.</div>';
+    updateSelectedPatientsCount();
+    return;
+  }
+
+  container.innerHTML = visibleOptions.map((option) => `
+    <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm font-bold text-slate-800 transition hover:border-emerald-100 hover:bg-emerald-50">
+      <input type="checkbox" data-patient-id="${escapeHtml(option.value)}" ${option.selected ? 'checked' : ''} class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+      <span class="min-w-0 flex-1 truncate">${escapeHtml(option.textContent)}</span>
+    </label>
+  `).join('');
+
+  container.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      const select = document.getElementById('psych-session-patients');
+      const option = select ? Array.from(select.options).find((item) => item.value === checkbox.dataset.patientId) : null;
+      if (option) option.selected = checkbox.checked;
+      updateSelectedPatientsCount();
+      renderPsychPatientOptions();
+    });
+  });
+
+  updateSelectedPatientsCount();
+}
+
+function updateSelectedPatientsCount() {
+  const select = document.getElementById('psych-session-patients');
+  const count = document.getElementById('psych-selected-patients-count');
+  const toggle = document.getElementById('psych-select-patients-toggle');
+  if (!select) return;
+
+  const total = select.options.length;
+  const selected = Array.from(select.selectedOptions).length;
+  const visibleOptions = getVisiblePatientOptions();
+  const visibleSelected = visibleOptions.filter((option) => option.selected).length;
+  if (count) count.textContent = `${selected} selected from ${total}`;
+  if (toggle) toggle.textContent = visibleOptions.length > 0 && visibleSelected === visibleOptions.length ? 'Clear Shown' : 'Select Shown';
+}
+
+function toggleAllPsychPatients() {
+  const options = getVisiblePatientOptions();
+  const shouldSelectAll = options.some((option) => !option.selected);
+  options.forEach((option) => {
+    option.selected = shouldSelectAll;
+  });
+  renderPsychPatientOptions();
+  updateSelectedPatientsCount();
+}
+
+function setPsychSessionFormMode(session = null) {
+  psychEditingSessionId = session?._id || '';
+
+  const title = document.getElementById('psych-session-modal-title');
+  const saveLabel = document.getElementById('psych-session-save-label');
+  const form = document.getElementById('psych-session-form');
+  const psychSelect = document.getElementById('psych-session-psychologist');
+  const dateField = document.getElementById('psych-session-date');
+  const timeField = document.getElementById('psych-session-time');
+  const titleField = document.getElementById('psych-session-title');
+  const patientSelect = document.getElementById('psych-session-patients');
+
+  if (form) form.reset();
+  if (title) title.textContent = session ? 'Edit Session' : 'Add Session';
+  if (saveLabel) saveLabel.textContent = session ? 'Update Session' : 'Save Session';
+  if (psychSelect) psychSelect.value = session?.psychologist_id || psychSelect.value || '';
+  if (dateField) dateField.value = session?.date || new Date().toISOString().split('T')[0];
+  if (timeField) timeField.value = session?.time_slot || '';
+  if (titleField) titleField.value = session?.title || '';
+
+  if (patientSelect) {
+    const selectedIds = new Set(session?.patient_ids || []);
+    Array.from(patientSelect.options).forEach((option) => {
+      option.selected = selectedIds.has(option.value);
+    });
+  }
+  const patientSearch = document.getElementById('psych-patient-search');
+  if (patientSearch) patientSearch.value = '';
+  renderPsychPatientOptions();
+  updateSelectedPatientsCount();
 }
 
 async function loadPsychSessions() {
@@ -72,54 +202,96 @@ async function loadPsychSessions() {
     renderPsychSessions();
   } catch (error) {
     console.error('Load psych sessions error', error);
-    const tbody = document.getElementById('psych-sessions-body');
-    if (tbody) {
-      tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-red-500">Unable to load sessions.</td></tr>';
-    }
+    psychSessions = [];
+    updatePsychSessionStats();
+    renderSessionState('Unable to load sessions.', 'red');
   }
 }
 
 function renderPsychSessions() {
-  const tbody = document.getElementById('psych-sessions-body');
-  if (!tbody) return;
+  const container = document.getElementById('psych-sessions-body');
+  if (!container) return;
+
+  updatePsychSessionStats();
 
   if (!psychSessions || psychSessions.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-gray-400">No sessions found.</td></tr>';
+    renderSessionState('No sessions found.');
     return;
   }
 
   const canAddNote = ['Psychologist', 'Admin'].includes(currentUser.role);
   const isAdmin = currentUser.role === 'Admin';
 
-  tbody.innerHTML = psychSessions.map((session) => {
-    const patients = (session.patient_names || []).join(', ');
+  container.innerHTML = psychSessions.map((session) => {
+    const patientNames = session.patient_names || [];
+    const patientChips = patientNames.length
+      ? patientNames.slice(0, 6).map((name) => `
+          <span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-black text-slate-700">${escapeHtml(name)}</span>
+        `).join('')
+      : '<span class="text-xs font-bold text-slate-500">No patients</span>';
+    const extraPatients = patientNames.length > 6
+      ? `<span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600">+${patientNames.length - 6}</span>`
+      : '';
     const detail = session.note_detail || {};
-    const noteStatus = session.note
-      ? `<div class="font-semibold text-emerald-700">Saved</div>
-           <div class="text-xs text-gray-600">Issue: ${escapeHtml(detail.issue || '')}</div>
-           <div class="text-xs text-gray-600">Intervention: ${escapeHtml(detail.intervention || '')}</div>
-           <div class="text-xs text-gray-600">Response: ${escapeHtml(detail.response || '')}</div>
-           <div class="text-[11px] text-gray-400">by ${escapeHtml(session.note_author || 'Unknown')}</div>`
-      : '<span class="font-semibold text-amber-600">Pending</span>';
+    const isSaved = Boolean(session.note);
+    const noteStatus = isSaved
+      ? `<div class="grid gap-1 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2">
+           <div class="flex items-center justify-between gap-2">
+             <span class="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">Saved</span>
+             <span class="text-[11px] font-bold text-emerald-800">${escapeHtml(session.note_author || 'Unknown')}</span>
+           </div>
+           <p class="text-sm font-bold text-slate-800">${escapeHtml(detail.issue || 'No issue noted')}</p>
+           <p class="line-clamp-2 text-xs font-semibold text-slate-600">${escapeHtml(detail.response || detail.intervention || '')}</p>
+         </div>`
+      : `<div class="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
+           <span class="text-xs font-black uppercase tracking-[0.12em] text-amber-700">Pending Note</span>
+         </div>`;
 
-    const actionBtn = session.note
+    const noteAction = isSaved
       ? (isAdmin
-        ? `<button class="font-semibold text-blue-600 hover:text-blue-800" onclick="openPsychNoteModal('${session._id}', true)">Edit Note</button>`
-        : '<span class="text-sm text-gray-400">Locked</span>')
+        ? `<button class="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 text-xs font-black text-blue-700 hover:bg-blue-100" onclick="openPsychNoteModal('${session._id}', true)">
+             <i class="fas fa-pen"></i><span>Edit Note</span>
+           </button>`
+        : '<span class="inline-flex h-9 items-center rounded-xl bg-slate-100 px-3 text-xs font-black text-slate-500">Locked</span>')
       : (canAddNote
-        ? `<button class="font-semibold text-emerald-700 hover:text-emerald-900" onclick="openPsychNoteModal('${session._id}')">Add Note</button>`
+        ? `<button class="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-black text-white hover:bg-emerald-700" onclick="openPsychNoteModal('${session._id}')">
+             <i class="fas fa-plus"></i><span>Add Note</span>
+           </button>`
         : '-');
+    const adminActions = isAdmin
+      ? `<button class="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 hover:bg-slate-100" onclick="openPsychSessionModal('${session._id}')">
+           <i class="fas fa-pen"></i><span>Edit</span>
+         </button>
+         <button class="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 text-xs font-black text-red-700 hover:bg-red-100" onclick="deletePsychSession('${session._id}')">
+           <i class="fas fa-trash"></i><span>Delete</span>
+         </button>`
+      : '';
+    const actionBtn = `<div class="flex flex-wrap justify-start gap-2 xl:justify-end">${noteAction}${adminActions}</div>`;
 
     return `
-      <tr class="hover:bg-emerald-50">
-        <td class="px-3 py-2">${session.date || ''}</td>
-        <td class="px-3 py-2">${session.time_slot || ''}</td>
-        <td class="px-3 py-2">${escapeHtml(session.psychologist_name || session.psychologist_id || '')}</td>
-        <td class="px-3 py-2">${patients}</td>
-        <td class="px-3 py-2">${escapeHtml(session.title || '')}</td>
-        <td class="px-3 py-2">${noteStatus}</td>
-        <td class="px-3 py-2 text-center">${actionBtn}</td>
-      </tr>
+      <article class="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:border-emerald-100 hover:bg-emerald-50/20">
+        <div class="grid gap-3 xl:grid-cols-[11rem_minmax(0,1fr)_16rem_auto] xl:items-center">
+          <div>
+            <p class="text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">${escapeHtml(formatSessionDate(session.date))}</p>
+            <p class="mt-1 text-sm font-black text-slate-950">${escapeHtml(session.time_slot || 'No time set')}</p>
+          </div>
+
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <h4 class="truncate text-base font-black text-slate-950">${escapeHtml(session.title || 'Psych Session')}</h4>
+              <span class="rounded-full ${isSaved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'} px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.1em]">
+                ${isSaved ? 'Saved' : 'Pending'}
+              </span>
+            </div>
+            <p class="mt-1 text-xs font-bold text-slate-500">${escapeHtml(session.psychologist_name || session.psychologist_id || 'Psychologist not set')}</p>
+            <div class="mt-2 flex flex-wrap gap-1.5">${patientChips}${extraPatients}</div>
+          </div>
+
+          <div>${noteStatus}</div>
+
+          <div>${actionBtn}</div>
+        </div>
+      </article>
     `;
   }).join('');
 }
@@ -139,8 +311,9 @@ async function submitPsychSession(event) {
   }
 
   try {
-    const res = await fetch('/api/psych-sessions', {
-      method: 'POST',
+    const url = psychEditingSessionId ? `/api/psych-sessions/${psychEditingSessionId}` : '/api/psych-sessions';
+    const res = await fetch(url, {
+      method: psychEditingSessionId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         psychologist_id: psychId,
@@ -152,15 +325,49 @@ async function submitPsychSession(event) {
     });
     if (!res.ok) throw new Error('save failed');
 
-    showSuccessModal('Session saved');
+    showSuccessModal(psychEditingSessionId ? 'Session updated' : 'Session saved');
     await loadPsychSessions();
-    document.getElementById('psych-session-form')?.reset();
-    const todayIso = new Date().toISOString().split('T')[0];
-    const dateField = document.getElementById('psych-session-date');
-    if (dateField) dateField.value = todayIso;
+    closePsychSessionModal();
   } catch (error) {
     console.error(error);
     showSuccessModal('Could not save session.', true);
+  }
+}
+
+function openPsychSessionModal(sessionId = '') {
+  const modal = document.getElementById('psych-session-modal');
+  const session = psychSessions.find((entry) => entry._id === sessionId) || null;
+  setPsychSessionFormMode(session);
+  modal?.classList.remove('hidden');
+  modal?.classList.add('flex');
+}
+
+function closePsychSessionModal() {
+  const modal = document.getElementById('psych-session-modal');
+  modal?.classList.add('hidden');
+  modal?.classList.remove('flex');
+  setPsychSessionFormMode();
+}
+
+async function deletePsychSession(sessionId) {
+  if (currentUser.role !== 'Admin') {
+    showSuccessModal('Only admins can delete sessions.', true);
+    return;
+  }
+
+  const confirmed = typeof window.confirmAction === 'function'
+    ? await window.confirmAction('Delete this psych session?')
+    : window.confirm('Delete this psych session?');
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`/api/psych-sessions/${sessionId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('delete failed');
+    showSuccessModal('Session deleted');
+    await loadPsychSessions();
+  } catch (error) {
+    console.error('Delete psych session error', error);
+    showSuccessModal('Could not delete session.', true);
   }
 }
 
@@ -231,7 +438,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (formDate && !formDate.value) formDate.value = todayIso;
 
   if (currentUser.role === 'Admin') {
-    document.getElementById('psych-assign-card')?.classList.remove('hidden');
+    const addButton = document.getElementById('psych-add-session-btn');
+    addButton?.classList.remove('hidden');
+    addButton?.classList.add('inline-flex');
+    addButton?.addEventListener('click', () => openPsychSessionModal());
+    document.getElementById('psych-select-patients-toggle')?.addEventListener('click', toggleAllPsychPatients);
+    document.getElementById('psych-session-patients')?.addEventListener('change', updateSelectedPatientsCount);
+    document.getElementById('psych-patient-search')?.addEventListener('input', renderPsychPatientOptions);
+    document.getElementById('psych-session-modal')?.addEventListener('click', (event) => {
+      if (event.target.id === 'psych-session-modal') closePsychSessionModal();
+    });
     await populatePsychologists();
     await populatePsychPatients();
   }
@@ -241,6 +457,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 window.loadPsychSessions = loadPsychSessions;
 window.submitPsychSession = submitPsychSession;
+window.openPsychSessionModal = openPsychSessionModal;
+window.closePsychSessionModal = closePsychSessionModal;
+window.deletePsychSession = deletePsychSession;
 window.openPsychNoteModal = openPsychNoteModal;
 window.closePsychNoteModal = closePsychNoteModal;
 window.savePsychNote = savePsychNote;

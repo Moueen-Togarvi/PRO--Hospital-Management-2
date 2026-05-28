@@ -23,53 +23,93 @@
       visibility: visible !important;
     }
 
-    #attendance-view .overflow-x-auto {
-      overflow: visible !important;
-    }
-
-    #attendance-view table {
-      width: 100%;
+    body.print-attendance .attendance-print-container table {
+      width: 100% !important;
     }
 
     #attendance-view th,
     #attendance-view td {
       white-space: nowrap;
     }
+
+    #attendance-view .attendance-table-wrap {
+      overflow: visible;
+      width: 100%;
+    }
   </style>
 {% endblock %}
 
 {% block content %}
 <section id="attendance-view" class="view-section -mx-4 -my-5 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
-  <div id="attendance-section">
-    <div class="mb-6">
-      <h2 class="text-2xl font-bold text-green-900">
-        <i class="fas fa-calendar-check mr-2"></i>Staff Attendance
-      </h2>
-      <p class="text-sm text-gray-500">Track and manage monthly staff attendance records.</p>
-    </div>
+  <div id="attendance-section" class="mx-auto max-w-7xl space-y-4">
+    <div class="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm shadow-emerald-100/60">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div class="flex items-start gap-3">
+          <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-lg text-white shadow-lg shadow-emerald-100">
+            <i class="fas fa-calendar-check"></i>
+          </span>
+          <div>
+            <p class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600">Staff Records</p>
+            <h2 class="mt-1 text-2xl font-black text-slate-950">Monthly Attendance</h2>
+            <p class="mt-1 text-sm font-semibold text-slate-600">Track and manage monthly staff attendance records.</p>
+          </div>
+        </div>
 
-    <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
-      <div class="mb-4 flex flex-wrap items-center gap-3">
-        <h3 class="text-lg font-bold text-gray-800">Monthly Attendance</h3>
-        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700">
-          Month
-          <input id="attendance-month" type="month" class="rounded border px-2 py-1 text-sm" />
-        </label>
-        <button
-          id="attendance-print-btn"
-          class="ml-auto rounded bg-emerald-600 px-3 py-2 text-white shadow-sm hover:bg-emerald-700"
-          type="button"
-        >
-          <i class="fas fa-print mr-2"></i>Print
-        </button>
+        <div class="flex flex-wrap items-end gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-2">
+          <label class="grid gap-1">
+            <span class="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Month</span>
+            <input id="attendance-month" type="month" class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-black text-slate-800 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" />
+          </label>
+          <button
+            id="attendance-print-btn"
+            class="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-black text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700"
+            type="button"
+          >
+            <i class="fas fa-print text-xs"></i>
+            <span>Print</span>
+          </button>
+        </div>
       </div>
 
-      <div class="table-scroll-shell overflow-x-auto rounded-lg border bg-white" style="--table-scroll-max-height: 28rem;">
+      <div class="mt-4 grid gap-2 sm:grid-cols-4">
+        <div class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+          <p class="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Staff</p>
+          <p id="attendance-staff-count" class="mt-1 text-xl font-black text-slate-950">0</p>
+        </div>
+        <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2">
+          <p class="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">Present</p>
+          <p id="attendance-present-count" class="mt-1 text-xl font-black text-emerald-700">0</p>
+        </div>
+        <div class="rounded-xl border border-red-100 bg-red-50 px-3 py-2">
+          <p class="text-[10px] font-black uppercase tracking-[0.14em] text-red-700">Absent</p>
+          <p id="attendance-absent-count" class="mt-1 text-xl font-black text-red-700">0</p>
+        </div>
+        <div class="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
+          <p class="text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">Half Day</p>
+          <p id="attendance-half-count" class="mt-1 text-xl font-black text-amber-700">0</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm shadow-emerald-100/60">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+        <div>
+          <h3 class="text-lg font-black text-slate-950">Attendance Sheet</h3>
+          <p id="attendance-month-label" class="text-xs font-bold text-slate-500">Loading...</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span class="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-900">P Present</span>
+          <span class="rounded-full bg-red-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-red-900">A Absent</span>
+          <span class="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-amber-900">H Half</span>
+        </div>
+      </div>
+
+      <div class="attendance-table-wrap">
         <table class="w-full table-fixed border-collapse text-sm">
-          <thead class="bg-emerald-600 text-white">
+          <thead class="sticky top-0 z-20 bg-slate-800">
             <tr id="attendance-header-row"></tr>
           </thead>
-          <tbody id="attendance-table-body"></tbody>
+          <tbody id="attendance-table-body" class="divide-y divide-slate-100"></tbody>
         </table>
       </div>
     </div>
@@ -78,5 +118,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-  <script src="{{ url_for('static', filename='js/pages/attendance.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pages/attendance.js', v='20260528-attendance-slate-head') }}"></script>
 {% endblock %}
