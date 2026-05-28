@@ -1,5 +1,6 @@
 let patientsData = [];
 let patientsSearchTerm = '';
+let patientsStatusFilter = 'active';
 const dischargedPatientIds = new Set();
 
 function formatNumber(value) {
@@ -33,6 +34,23 @@ function resolvePatientId(id) {
   return match ? target : '';
 }
 
+function isPatientDischarged(patient) {
+  const patientId = patient?._id || patient?.id || '';
+  return dischargedPatientIds.has(String(patientId)) || Boolean(patient?.isDischarged);
+}
+
+function updatePatientsFilterToggle() {
+  document.querySelectorAll('[data-patients-filter]').forEach((button) => {
+    const isActive = button.dataset.patientsFilter === patientsStatusFilter;
+    button.setAttribute('aria-selected', String(isActive));
+    button.classList.toggle('bg-[#087f8c]', isActive);
+    button.classList.toggle('text-white', isActive);
+    button.classList.toggle('shadow-sm', isActive);
+    button.classList.toggle('text-slate-500', !isActive);
+    button.classList.toggle('hover:bg-cyan-50', !isActive);
+  });
+}
+
 function showSuccessModal(message, isError = false) {
   if (typeof window.showToast === 'function') {
     window.showToast(message, isError);
@@ -56,31 +74,23 @@ function renderPatientsTable(list) {
   if (!tbody) return;
 
   tbody.innerHTML = '';
+  updatePatientsFilterToggle();
+
   const normalizedSearch = patientsSearchTerm.trim().toLowerCase();
   const filteredList = normalizedSearch
     ? list.filter((patient) => (patient.name || '').toLowerCase().includes(normalizedSearch))
     : list;
 
-  if (filteredList.length === 0) {
-    const emptyMessage = normalizedSearch ? 'No patients match your search.' : 'No records found.';
-    const colspanCount = document.querySelectorAll('#patients-table-headers th').length || 12;
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="${colspanCount}" class="p-6 text-center text-gray-400">${emptyMessage}</td>
-      </tr>
-    `;
-
-    const totalCollection = document.getElementById('patients-total-collection');
-    if (totalCollection) totalCollection.innerText = 'Rs 0';
-    return;
-  }
-
   const activePatients = [];
   const dischargedPatients = [];
+  let totalCollectionValue = 0;
 
   filteredList.forEach((patient) => {
     const patientId = patient._id || patient.id;
-    const isDischarged = dischargedPatientIds.has(String(patientId)) || patient.isDischarged;
+    const isDischarged = isPatientDischarged(patient);
+    const receivedValue = parseInt(String(patient.receivedAmount || '0').replace(/,/g, ''), 10) || 0;
+    totalCollectionValue += receivedValue;
+
     if (isDischarged) {
       if (patientId) dischargedPatientIds.add(String(patientId));
       dischargedPatients.push({ patient: { ...patient, isDischarged: true }, patientId: String(patientId || '') });
@@ -89,12 +99,34 @@ function renderPatientsTable(list) {
     }
   });
 
-  const orderedPatients = [...activePatients, ...dischargedPatients];
+  const totalRecords = document.getElementById('patients-total-count');
+  const activeCount = document.getElementById('patients-active-count');
+  const dischargedCount = document.getElementById('patients-discharged-count');
+  const totalCollection = document.getElementById('patients-total-collection');
 
-  let totalCollectionValue = 0;
+  if (totalRecords) totalRecords.innerText = formatNumber(filteredList.length);
+  if (activeCount) activeCount.innerText = formatNumber(activePatients.length);
+  if (dischargedCount) dischargedCount.innerText = formatNumber(dischargedPatients.length);
+  if (totalCollection) totalCollection.innerText = `Rs ${formatNumber(totalCollectionValue)}`;
+
+  const orderedPatients = patientsStatusFilter === 'discharged' ? dischargedPatients : activePatients;
+
+  if (orderedPatients.length === 0) {
+    const statusLabel = patientsStatusFilter === 'discharged' ? 'discharged patients' : 'active patients';
+    const emptyMessage = normalizedSearch
+      ? `No ${statusLabel} match your search.`
+      : `No ${statusLabel} found.`;
+    const colspanCount = document.querySelectorAll('#patients-table-headers th').length || 11;
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="${colspanCount}" class="p-6 text-center text-gray-400">${emptyMessage}</td>
+      </tr>
+    `;
+    return;
+  }
 
   orderedPatients.forEach(({ patient, patientId }, index) => {
-    const isDischarged = dischargedPatientIds.has(patientId) || patient.isDischarged;
+    const isDischarged = isPatientDischarged(patient);
     const rowContrastClass = isDischarged ? 'bg-gray-50' : '';
     const textClass = 'text-gray-900';
     const subTextClass = 'text-gray-500';
@@ -121,9 +153,6 @@ function renderPatientsTable(list) {
     const totalBillValue = calculatedFee + canteenSpentValue + laundryValue;
     const receivedValue = parseInt(String(patient.receivedAmount || '0').replace(/,/g, ''), 10) || 0;
     const balanceDue = totalBillValue - receivedValue;
-
-    totalCollectionValue += receivedValue;
-
     const stayDisplay = `<div class="text-sm font-black ${valueClass}">${daysElapsed} Days</div>
       <div class="text-[9px] font-bold uppercase tracking-tight ${subTextClass}">${months} Months</div>`;
 
@@ -152,9 +181,8 @@ function renderPatientsTable(list) {
         <div class="mt-0.5 text-[9px] font-bold tracking-tight ${subTextClass}">${formattedPid}</div>
       </td>
       <td class="w-[100px] border-r border-gray-100 px-2 py-3 text-center text-[11px] font-bold ${textClass}">${patient.fatherName || '—'}</td>
-      <td class="w-[95px] border-r border-gray-100 px-2 py-3 text-center text-[11px] font-bold ${textClass}">${patient.contactNo || patient.contact || patient.phone || '—'}</td>
+      <td class="w-[125px] whitespace-nowrap border-r border-gray-100 px-2 py-3 text-center text-[11px] font-bold ${textClass}">${patient.contactNo || patient.contact || patient.phone || '—'}</td>
       <td class="border-r border-gray-100 px-2 py-3 text-[10px] font-black uppercase tracking-tight ${subTextClass}">${admissionStr ? formatDisplayDate(admissionStr) : '—'}</td>
-      <td class="max-w-[90px] whitespace-nowrap truncate border-r border-gray-100 px-2 py-3 text-[11px] font-bold ${textClass}">${patient.area || patient.address || '—'}</td>
       <td class="border-r border-gray-100 px-2 py-3 text-[11px] font-black ${valueClass}">Rs. ${formatNumber(monthlyFeeRaw)}</td>
       <td class="border-r border-gray-100 px-2 py-3">${stayDisplay}</td>
       <td class="border-r border-gray-100 px-2 py-3 text-[11px] font-black ${textClass}">Rs. ${formatNumber(totalBillValue)}</td>
@@ -199,15 +227,6 @@ function renderPatientsTable(list) {
     tbody.appendChild(row);
   });
 
-  const totalRecords = document.getElementById('patients-total-count');
-  const activeCount = document.getElementById('patients-active-count');
-  const dischargedCount = document.getElementById('patients-discharged-count');
-  const totalCollection = document.getElementById('patients-total-collection');
-
-  if (totalRecords) totalRecords.innerText = formatNumber(orderedPatients.length);
-  if (activeCount) activeCount.innerText = formatNumber(activePatients.length);
-  if (dischargedCount) dischargedCount.innerText = formatNumber(dischargedPatients.length);
-  if (totalCollection) totalCollection.innerText = `Rs ${formatNumber(totalCollectionValue)}`;
 }
 
 async function triggerWhatsAppBill(id) {
@@ -334,12 +353,17 @@ window.handlePatientsSearch = function handlePatientsSearch(value) {
   renderPatientsTable(patientsData);
 };
 
+window.handlePatientsStatusFilter = function handlePatientsStatusFilter(value) {
+  patientsStatusFilter = value === 'discharged' ? 'discharged' : 'active';
+  renderPatientsTable(patientsData);
+};
+
 async function loadPatients() {
   const tbody = document.getElementById('patients-table-body');
   if (tbody) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="12" class="p-6 text-center text-gray-400">Loading patient directory...</td>
+        <td colspan="11" class="p-6 text-center text-gray-400">Loading patient directory...</td>
       </tr>
     `;
   }
@@ -359,7 +383,7 @@ async function loadPatients() {
     if (tbody) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="12" class="p-6 text-center text-red-500">Unable to load patient records right now.</td>
+          <td colspan="11" class="p-6 text-center text-red-500">Unable to load patient records right now.</td>
         </tr>
       `;
     }
@@ -367,6 +391,12 @@ async function loadPatients() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-patients-filter]').forEach((button) => {
+    button.addEventListener('click', () => {
+      window.handlePatientsStatusFilter(button.dataset.patientsFilter);
+    });
+  });
+
   loadPatients();
 });
 

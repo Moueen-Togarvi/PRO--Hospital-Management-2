@@ -2,7 +2,9 @@ const patientDetailState = {
   patientId: window.__APP__?.patientId || '',
   currentUser: window.__APP__?.currentUser || { role: 'Guest' },
   patient: null,
-  activeTab: 'notes',
+  records: [],
+  activeRecordType: 'session_note',
+  editingRecordId: null,
 };
 
 const canAddSessionNote = () => ['Admin', 'Psychologist'].includes(patientDetailState.currentUser.role);
@@ -55,27 +57,27 @@ function buildSummaryCard(patient) {
 
   container.innerHTML = `
     <div class="summary-stat">
-      <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Patient</div>
-      <div class="mt-1 text-base font-black text-slate-950">${patient.name || 'Unknown'}</div>
-      <div class="mt-1 text-sm font-semibold text-slate-500">${patient.fatherName || patient.guardianName || '—'}</div>
+      <div class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-700">Patient</div>
+      <div class="mt-1 text-sm font-black text-slate-950">${patient.name || 'Unknown'}</div>
+      <div class="mt-0.5 text-xs font-bold text-slate-700">${patient.fatherName || patient.guardianName || '—'}</div>
     </div>
     <div class="summary-stat">
-      <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Status</div>
-      <div class="mt-1 text-base font-black ${patient.isDischarged ? 'text-slate-500' : 'text-emerald-700'}">${patient.isDischarged ? 'Discharged' : 'Active'}</div>
+      <div class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-700">Status</div>
+      <div class="mt-1 text-sm font-black ${patient.isDischarged ? 'text-slate-700' : 'text-emerald-700'}">${patient.isDischarged ? 'Discharged' : 'Active'}</div>
     </div>
     <div class="summary-stat">
-      <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Monthly Fee</div>
-      <div class="mt-1 text-base font-black text-slate-950">Rs ${new Intl.NumberFormat('en-US').format(monthlyFee)}</div>
+      <div class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-700">Monthly Fee</div>
+      <div class="mt-1 text-sm font-black text-slate-950">Rs ${new Intl.NumberFormat('en-US').format(monthlyFee)}</div>
     </div>
     <div class="summary-stat">
-      <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Received</div>
-      <div class="mt-1 text-base font-black text-slate-950">Rs ${new Intl.NumberFormat('en-US').format(received)}</div>
+      <div class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-700">Received</div>
+      <div class="mt-1 text-sm font-black text-slate-950">Rs ${new Intl.NumberFormat('en-US').format(received)}</div>
     </div>
     <div class="summary-stat">
-      <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Balance</div>
-      <div class="mt-1 text-base font-black ${balance > 0 ? 'text-red-600' : balance < 0 ? 'text-emerald-600' : 'text-slate-500'}">
+      <div class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-700">Balance</div>
+      <div class="mt-1 text-sm font-black ${balance > 0 ? 'text-red-600' : balance < 0 ? 'text-emerald-600' : 'text-slate-700'}">
         Rs ${new Intl.NumberFormat('en-US').format(Math.abs(balance))}
-        <span class="text-sm">${balance > 0 ? 'Due' : balance < 0 ? 'Refund' : 'Cleared'}</span>
+        <span class="text-xs">${balance > 0 ? 'Due' : balance < 0 ? 'Refund' : 'Cleared'}</span>
       </div>
     </div>
   `;
@@ -99,8 +101,8 @@ function updateCallCalendar(admissionDateStr) {
   const callDayName = days[dayOfWeekIndex];
 
   nextCall.innerHTML = `
-    <div class="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-500">Weekly Call Day</div>
-    <div class="mt-2 text-2xl font-black text-emerald-700">${callDayName}</div>
+    <div class="call-day-label">Weekly Call Day</div>
+    <div class="call-day-value">${callDayName}</div>
   `;
 
   calendarEl.innerHTML = '';
@@ -129,10 +131,23 @@ function updateCallCalendar(admissionDateStr) {
   }
 }
 
+function getPatientDisplayId(patient) {
+  const savedId = String(patient?.idNo || '').trim();
+  if (savedId) return savedId;
+
+  const rawId = String(patient?._id || patientDetailState.patientId || '')
+    .replace(/[^a-z0-9]/gi, '')
+    .toUpperCase();
+  return rawId ? `P-${rawId.slice(-6)}` : 'P-000000';
+}
+
 function populatePatient(patient) {
   patientDetailState.patient = patient;
+  const displayId = getPatientDisplayId(patient);
   document.getElementById('patient-detail-title').textContent = patient.name || 'Patient Detail';
-  document.getElementById('patient-detail-subtitle').textContent = `${patient.fatherName || 'Guardian not set'} • Admitted ${patient.admissionDate || 'unknown date'}`;
+  const subtitle = document.getElementById('patient-detail-subtitle');
+  subtitle.textContent = displayId;
+  subtitle.title = patient._id || displayId;
   document.getElementById('patient-bill-preview-link').href = `/api/patients/${patientDetailState.patientId}/bill/preview`;
 
   setFieldValue('det-name', patient.name);
@@ -211,41 +226,139 @@ function printPatientProfile() {
   }, 500);
 }
 
-function renderRecordList(targetId, records, type) {
-  const container = document.getElementById(targetId);
-  if (!container) return;
+function escapeRecordHtml(value) {
+  if (typeof window.escapeHtml === 'function') return window.escapeHtml(value);
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
-  const filtered = records.filter((record) => record.type === type);
-  if (filtered.length === 0) {
-    container.innerHTML = `
-      <div class="record-item text-sm font-semibold text-slate-400">
-        No ${type === 'session_note' ? 'session notes' : 'medical records'} found yet.
-      </div>
-    `;
+function recordTypeLabel(type = patientDetailState.activeRecordType) {
+  return type === 'medical_record' ? 'Medical Records' : 'Session Notes';
+}
+
+function canManageRecordType(type = patientDetailState.activeRecordType) {
+  return type === 'medical_record' ? canAddMedicalRecord() : canAddSessionNote();
+}
+
+function getRecordRoute(type, recordId = '') {
+  const suffix = recordId ? `/${recordId}` : '';
+  return `/api/patients/${patientDetailState.patientId}/${type}${suffix}`;
+}
+
+function formatRecordDate(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return 'Just now';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function setRecordFormMode(record = null) {
+  const isMedical = patientDetailState.activeRecordType === 'medical_record';
+  const titleInput = document.getElementById('records-modal-title-input');
+  const textInput = document.getElementById('records-modal-text-input');
+  const saveButton = document.getElementById('records-modal-save');
+  const cancelButton = document.getElementById('records-modal-cancel-edit');
+
+  patientDetailState.editingRecordId = record?._id || null;
+  if (titleInput) {
+    titleInput.classList.toggle('hidden', !isMedical);
+    titleInput.value = record?.title || '';
+  }
+  if (textInput) {
+    textInput.value = record?.text || record?.details || '';
+    textInput.placeholder = isMedical ? 'Write medical record details...' : 'Write psychology / counseling note...';
+  }
+  if (saveButton) {
+    saveButton.innerHTML = patientDetailState.editingRecordId
+      ? '<i class="fas fa-check"></i><span>Update Record</span>'
+      : '<i class="fas fa-plus"></i><span>Add Record</span>';
+  }
+  if (cancelButton) cancelButton.classList.toggle('hidden', !patientDetailState.editingRecordId);
+}
+
+function renderRecordsModal() {
+  const list = document.getElementById('records-modal-list');
+  const title = document.getElementById('records-modal-title');
+  const kicker = document.getElementById('records-modal-kicker');
+  const form = document.getElementById('records-modal-form');
+  const permission = document.getElementById('records-modal-permission');
+  const records = patientDetailState.records.filter((record) => record.type === patientDetailState.activeRecordType);
+  const canManage = canManageRecordType();
+
+  if (title) title.textContent = recordTypeLabel();
+  if (kicker) kicker.textContent = canManage ? 'Add, edit, or delete' : 'View records';
+  if (form) form.classList.toggle('records-form-disabled', !canManage);
+  if (permission) {
+    permission.textContent = patientDetailState.activeRecordType === 'medical_record'
+      ? 'Only Admin and Doctor roles can add, edit, or delete medical records.'
+      : 'Only Admin and Psychologist roles can add, edit, or delete session notes.';
+    permission.classList.toggle('hidden', canManage);
+  }
+
+  if (!list) return;
+
+  if (records.length === 0) {
+    list.innerHTML = `<div class="records-empty">No ${recordTypeLabel().toLowerCase()} found yet.</div>`;
+    setRecordFormMode();
     return;
   }
 
-  container.innerHTML = filtered.map((record) => `
-    <article class="record-item">
-      <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
-        ${new Date(record.date).toLocaleDateString()} • ${record.recorded_by || 'Unknown'}
+  list.innerHTML = records.map((record) => {
+    const isMedical = record.type === 'medical_record';
+    const heading = isMedical ? (record.title || 'Medical Record') : 'Session Note';
+    const body = isMedical ? (record.details || '') : (record.text || '');
+    const actionHtml = canManage ? `
+      <div class="records-item-actions">
+        <button type="button" class="records-mini-btn records-edit-btn" data-edit-record="${escapeRecordHtml(record._id)}">
+          <i class="fas fa-pen"></i> Edit
+        </button>
+        <button type="button" class="records-mini-btn records-delete-btn" data-delete-record="${escapeRecordHtml(record._id)}">
+          <i class="fas fa-trash"></i> Delete
+        </button>
       </div>
-      <h4 class="mt-2 text-base font-black text-emerald-800">${record.title || record.type}</h4>
-      <p class="mt-2 whitespace-pre-wrap text-sm font-medium text-slate-600">${record.text || record.details || ''}</p>
-    </article>
-  `).join('');
+    ` : '';
+
+    return `
+      <article class="records-item">
+        <div class="records-item-top">
+          <div>
+            <div class="records-date">${escapeRecordHtml(formatRecordDate(record.date))} • ${escapeRecordHtml(record.recorded_by || 'Unknown')}</div>
+            <h4>${escapeRecordHtml(heading)}</h4>
+          </div>
+          ${actionHtml}
+        </div>
+        <p>${escapeRecordHtml(body)}</p>
+      </article>
+    `;
+  }).join('');
+
+  list.querySelectorAll('[data-edit-record]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const record = patientDetailState.records.find((item) => item._id === button.dataset.editRecord);
+      if (record) setRecordFormMode(record);
+    });
+  });
+
+  list.querySelectorAll('[data-delete-record]').forEach((button) => {
+    button.addEventListener('click', () => deleteRecord(button.dataset.deleteRecord));
+  });
+
+  if (!patientDetailState.editingRecordId) setRecordFormMode();
 }
 
 async function loadPatientRecords() {
   const { response, data } = await window.apiFetchJson(`/api/patients/${patientDetailState.patientId}/records`);
   if (!response.ok || !Array.isArray(data)) {
-    renderRecordList('session-notes-list', [], 'session_note');
-    renderRecordList('medical-records-list', [], 'medical_record');
+    patientDetailState.records = [];
+    renderRecordsModal();
     return;
   }
 
-  renderRecordList('session-notes-list', data, 'session_note');
-  renderRecordList('medical-records-list', data, 'medical_record');
+  patientDetailState.records = data;
+  renderRecordsModal();
 }
 
 async function loadPatient() {
@@ -303,51 +416,124 @@ async function savePatientDetails(event) {
   await loadPatient();
 }
 
-function showTab(tab) {
-  patientDetailState.activeTab = tab;
-  document.getElementById('tab-notes').classList.toggle('hidden', tab !== 'notes');
-  document.getElementById('tab-med').classList.toggle('hidden', tab !== 'records');
-  document.getElementById('notes-tab-btn').classList.toggle('active', tab === 'notes');
-  document.getElementById('records-tab-btn').classList.toggle('active', tab === 'records');
+async function deletePatient() {
+  if (!isAdminUser()) {
+    window.showToast('Only admins can delete patients.', true);
+    return;
+  }
+
+  const patientName = patientDetailState.patient?.name || 'this patient';
+  const confirmed = typeof window.confirmAction === 'function'
+    ? await window.confirmAction(`Delete ${patientName}? This will remove the patient from active records.`)
+    : window.confirm(`Delete ${patientName}? This will remove the patient from active records.`);
+
+  if (!confirmed) return;
+
+  const button = document.getElementById('patient-delete-btn');
+  if (button) {
+    button.disabled = true;
+  }
+
+  try {
+    const { response, data } = await window.apiFetchJson(`/api/patients/${patientDetailState.patientId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      window.showToast(data?.error || 'Unable to delete patient.', true);
+      return;
+    }
+
+    window.showToast(data?.message || 'Patient deleted successfully.');
+    window.setTimeout(() => {
+      window.location.href = '/patients';
+    }, 350);
+  } catch (error) {
+    window.showToast('Unable to delete patient.', true);
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
+  }
 }
 
-async function addSessionNote(event) {
+function openRecordsModal(type) {
+  patientDetailState.activeRecordType = type === 'medical_record' ? 'medical_record' : 'session_note';
+  const modal = document.getElementById('patient-records-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+  setRecordFormMode();
+  renderRecordsModal();
+}
+
+function closeRecordsModal() {
+  const modal = document.getElementById('patient-records-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+  setRecordFormMode();
+}
+
+async function saveRecordFromModal(event) {
   event.preventDefault();
-  const input = document.getElementById('new-session-note-input');
-  const { response, data } = await window.apiFetchJson(`/api/patients/${patientDetailState.patientId}/session_note`, {
-    method: 'POST',
+  if (!canManageRecordType()) {
+    window.showToast('You do not have permission to change these records.', true);
+    return;
+  }
+
+  const isMedical = patientDetailState.activeRecordType === 'medical_record';
+  const title = document.getElementById('records-modal-title-input')?.value.trim() || '';
+  const text = document.getElementById('records-modal-text-input')?.value.trim() || '';
+
+  if (!text && (!isMedical || !title)) {
+    window.showToast(isMedical ? 'Add a title or details first.' : 'Add a session note first.', true);
+    return;
+  }
+
+  const payload = isMedical ? { title, details: text } : { text };
+  const recordId = patientDetailState.editingRecordId;
+  const { response, data } = await window.apiFetchJson(getRecordRoute(patientDetailState.activeRecordType, recordId), {
+    method: recordId ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: input.value }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
-    window.showToast(data?.error || 'Unable to save session note.', true);
+    window.showToast(data?.error || 'Unable to save record.', true);
     return;
   }
 
   event.target.reset();
-  window.showToast('Session note added.');
+  setRecordFormMode();
+  window.showToast(data?.message || 'Record saved.');
   await loadPatientRecords();
 }
 
-async function addMedicalRecord(event) {
-  event.preventDefault();
-  const { response, data } = await window.apiFetchJson(`/api/patients/${patientDetailState.patientId}/medical_record`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      title: document.getElementById('new-med-title').value,
-      details: document.getElementById('new-med-details').value,
-    }),
-  });
-
-  if (!response.ok) {
-    window.showToast(data?.error || 'Unable to save medical record.', true);
+async function deleteRecord(recordId) {
+  if (!canManageRecordType()) {
+    window.showToast('You do not have permission to delete this record.', true);
     return;
   }
 
-  event.target.reset();
-  window.showToast('Medical record added.');
+  const confirmed = typeof window.confirmAction === 'function'
+    ? await window.confirmAction(`Delete this ${recordTypeLabel().toLowerCase().slice(0, -1)}?`)
+    : window.confirm(`Delete this ${recordTypeLabel().toLowerCase().slice(0, -1)}?`);
+  if (!confirmed) return;
+
+  const { response, data } = await window.apiFetchJson(getRecordRoute(patientDetailState.activeRecordType, recordId), {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    window.showToast(data?.error || 'Unable to delete record.', true);
+    return;
+  }
+
+  if (patientDetailState.editingRecordId === recordId) setRecordFormMode();
+  window.showToast(data?.message || 'Record deleted.');
   await loadPatientRecords();
 }
 
@@ -367,15 +553,9 @@ function setupPhotoInput(fileId, hiddenId, imgId) {
 }
 
 function applyPermissions() {
-  const sessionForm = document.getElementById('session-note-form');
-  const medicalForm = document.getElementById('medical-record-form');
-  const sessionPermission = document.getElementById('session-note-permission');
-  const medicalPermission = document.getElementById('medical-record-permission');
+  const deleteButton = document.getElementById('patient-delete-btn');
 
-  if (sessionForm) sessionForm.classList.toggle('hidden', !canAddSessionNote());
-  if (medicalForm) medicalForm.classList.toggle('hidden', !canAddMedicalRecord());
-  if (sessionPermission) sessionPermission.classList.toggle('hidden', canAddSessionNote());
-  if (medicalPermission) medicalPermission.classList.toggle('hidden', canAddMedicalRecord());
+  if (deleteButton) deleteButton.classList.toggle('hidden', !isAdminUser());
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -384,20 +564,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('patient-details-form')?.requestSubmit();
   });
   document.getElementById('patient-print-btn')?.addEventListener('click', printPatientProfile);
-  document.getElementById('session-note-form')?.addEventListener('submit', addSessionNote);
-  document.getElementById('medical-record-form')?.addEventListener('submit', addMedicalRecord);
-  document.getElementById('det-laundry-status')?.addEventListener('change', updateLaundryLabel);
-
-  document.querySelectorAll('[data-tab]').forEach((button) => {
-    button.addEventListener('click', () => showTab(button.dataset.tab));
+  document.getElementById('patient-delete-btn')?.addEventListener('click', deletePatient);
+  document.getElementById('patient-session-notes-btn')?.addEventListener('click', () => openRecordsModal('session_note'));
+  document.getElementById('patient-medical-records-btn')?.addEventListener('click', () => openRecordsModal('medical_record'));
+  document.getElementById('records-modal-form')?.addEventListener('submit', saveRecordFromModal);
+  document.getElementById('records-modal-close')?.addEventListener('click', closeRecordsModal);
+  document.getElementById('records-modal-cancel-edit')?.addEventListener('click', () => setRecordFormMode());
+  document.getElementById('patient-records-modal')?.addEventListener('click', (event) => {
+    if (event.target.id === 'patient-records-modal') closeRecordsModal();
   });
+  document.getElementById('det-laundry-status')?.addEventListener('change', updateLaundryLabel);
 
   setupPhotoInput('det-photo1-file', 'det-photo1-hidden', 'det-photo1-img');
   setupPhotoInput('det-photo2-file', 'det-photo2-hidden', 'det-photo2-img');
   setupPhotoInput('det-photo3-file', 'det-photo3-hidden', 'det-photo3-img');
 
   applyPermissions();
-  showTab('notes');
   await Promise.all([loadPatient(), loadPatientRecords()]);
 });
 

@@ -108,15 +108,19 @@ app.config["GMAIL_APP_PASSWORD"] = os.environ.get("GMAIL_APP_PASSWORD")
 app.config["PASSWORD_RESET_EXPIRY_MINUTES"] = int(os.environ.get("PASSWORD_RESET_EXPIRY_MINUTES", "30"))
 
 try:
-    mongo = PyMongo(app)
-    # Trigger a simple operation to verify connection
+    mongo = PyMongo(
+        app,
+        serverSelectionTimeoutMS=int(os.environ.get("MONGO_SERVER_SELECTION_TIMEOUT_MS", "3000")),
+    )
     with app.app_context():
-        # Using a timeout to ensure startup doesn't hang indefinitely
         mongo.cx.admin.command('ping')
     print("SUCCESS: Connected to MongoDB.")
 except Exception as e:
-    print(f"CRITICAL: MongoDB initialization failed: {type(e).__name__} - {e}")
-    mongo = None
+    if 'mongo' in globals():
+        print(f"WARNING: MongoDB ping failed at startup: {type(e).__name__} - {e}")
+    else:
+        print(f"CRITICAL: MongoDB initialization failed: {type(e).__name__} - {e}")
+        mongo = None
 
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 redis_conn = redis.from_url(redis_url)
@@ -128,6 +132,11 @@ serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 def check_db():
     if mongo is None or mongo.db is None:
         print("Database connection failed or not initialized.")
+        return False
+    try:
+        mongo.cx.admin.command('ping')
+    except Exception as e:
+        print(f"Database ping failed: {type(e).__name__} - {e}")
         return False
     return True
 

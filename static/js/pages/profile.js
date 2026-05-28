@@ -2,17 +2,14 @@
   const fields = {
     name: 'profile-name',
     system_name: 'profile-system-name',
-    header_label: 'profile-header-label',
-    short_name: 'profile-short-name',
-    phase_label: 'profile-phase-label',
     tagline: 'profile-tagline',
     owner_name: 'profile-owner-name',
     phone: 'profile-phone',
     email: 'profile-email',
     address: 'profile-address',
     website_url: 'profile-website-url',
-    logo_url: 'profile-logo-url',
   };
+  let profileState = {};
 
   function el(id) {
     return document.getElementById(id);
@@ -29,7 +26,7 @@
   }
 
   function collectProfile() {
-    const profile = {};
+    const profile = { ...profileState };
     Object.entries(fields).forEach(([key, id]) => {
       profile[key] = el(id)?.value.trim() || '';
     });
@@ -61,11 +58,13 @@
   }
 
   function hydrateForm(profile) {
+    const source = profile || {};
+    profileState = { ...source };
     Object.entries(fields).forEach(([key, id]) => {
       const input = el(id);
-      if (input) input.value = profile[key] || '';
+      if (input) input.value = source[key] || '';
     });
-    renderPreview(profile);
+    renderPreview(source);
   }
 
   async function handleLogoFile(event) {

@@ -41,6 +41,44 @@ h4,
   transition: margin-left 0.28s ease, width 0.28s ease;
 }
 
+.app-page-back-row {
+  padding: 0.65rem 1rem 0;
+}
+
+.app-page-back-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  padding: 0.42rem 0.75rem;
+  color: #1d4ed8;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.08);
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.app-page-back-btn:hover {
+  background: #dbeafe;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12);
+}
+
+@media (min-width: 768px) {
+  .app-page-back-row {
+    padding-right: 2rem;
+    padding-left: 2rem;
+  }
+}
+
 .nav-link {
   display: flex;
   align-items: center;

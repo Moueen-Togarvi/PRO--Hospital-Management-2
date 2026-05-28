@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Manrope:wght@500;600;700;800&family=DM+Sans:wght@400;500;700;800&display=swap" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0f766e" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app-shell.css', v='20260528-3') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app-shell.css', v='20260528-page-back') }}" />
   {% block extra_styles %}{% endblock %}
   <script>
     window.__APP__ = Object.assign(
@@ -24,6 +24,18 @@
     {% include "partials/sidebar.html" %}
     <div class="app-shell-content min-w-0">
       {% include "partials/topbar.html" %}
+      <div class="app-page-back-row">
+        <button
+          id="global-page-back"
+          type="button"
+          class="app-page-back-btn"
+          data-fallback="{{ back_url or '/dashboard' }}"
+          aria-label="Go back"
+        >
+          <i class="fas fa-arrow-left"></i>
+          <span>Back</span>
+        </button>
+      </div>
       <main class="px-4 py-5 md:px-8 md:py-8">
   {% else %}
       <main>
@@ -46,7 +58,7 @@
 
   <script src="{{ url_for('static', filename='js/shared/ui.js') }}"></script>
   {% if app_shell %}
-  <script src="{{ url_for('static', filename='js/shared/layout.js', v='20260528-3') }}"></script>
+  <script src="{{ url_for('static', filename='js/shared/layout.js', v='20260528-page-back') }}"></script>
   <script src="{{ url_for('static', filename='js/shared/password.js') }}"></script>
   {% if current_user and current_user.role == 'Admin' %}
   <script src="{{ url_for('static', filename='js/shared/payments.js') }}"></script>

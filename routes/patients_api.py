@@ -41,6 +41,14 @@ def register_patient_api_routes(
     login_required,
     role_required,
 ):
+    def patient_record_query(patient_id, record_id, record_type):
+        return {
+            '_id': ObjectId(record_id),
+            'patient_id': ObjectId(patient_id),
+            'type': record_type,
+            'deleted_at': {'$exists': False},
+        }
+
     @app.route('/api/patients', methods=['GET'])
     @login_required
     def get_patients():
@@ -283,13 +291,111 @@ def register_patient_api_routes(
             return jsonify({"error": "Database error"}), 500
 
         try:
-            records_cursor = mongo.db.patient_records.find({'patient_id': ObjectId(patient_id)}).sort('date', -1)
+            records_cursor = mongo.db.patient_records.find({
+                'patient_id': ObjectId(patient_id),
+                'deleted_at': {'$exists': False},
+            }).sort('date', -1)
             records = []
             for record in records_cursor:
                 record['_id'] = str(record['_id'])
                 record['patient_id'] = str(record['patient_id'])
-                record['date'] = record['date'].isoformat()
+                if record.get('date') and hasattr(record['date'], 'isoformat'):
+                    record['date'] = record['date'].isoformat()
                 records.append(record)
             return jsonify(records)
+        except Exception as error:
+            return jsonify({"error": str(error)}), 500
+
+    @app.route('/api/patients/<patient_id>/session_note/<record_id>', methods=['PUT'])
+    @role_required(['Admin', 'Psychologist'])
+    def update_session_note(patient_id, record_id):
+        if not check_db():
+            return jsonify({"error": "Database error"}), 500
+
+        try:
+            data = clean_input_data(request.json or {})
+            text = data.get('text', '')
+            if not text:
+                return jsonify({"error": "Session note is required"}), 400
+
+            result = mongo.db.patient_records.update_one(
+                patient_record_query(patient_id, record_id, 'session_note'),
+                {'$set': {
+                    'text': text,
+                    'updated_at': datetime.utcnow(),
+                    'updated_by': session.get('username', 'System'),
+                }}
+            )
+            if result.matched_count == 0:
+                return jsonify({"error": "Session note not found"}), 404
+            return jsonify({"message": "Session note updated"})
+        except Exception as error:
+            return jsonify({"error": str(error)}), 500
+
+    @app.route('/api/patients/<patient_id>/session_note/<record_id>', methods=['DELETE'])
+    @role_required(['Admin', 'Psychologist'])
+    def delete_session_note(patient_id, record_id):
+        if not check_db():
+            return jsonify({"error": "Database error"}), 500
+
+        try:
+            result = mongo.db.patient_records.update_one(
+                patient_record_query(patient_id, record_id, 'session_note'),
+                {'$set': {
+                    'deleted_at': datetime.utcnow(),
+                    'deleted_by': session.get('username', 'System'),
+                }}
+            )
+            if result.matched_count == 0:
+                return jsonify({"error": "Session note not found"}), 404
+            return jsonify({"message": "Session note deleted"})
+        except Exception as error:
+            return jsonify({"error": str(error)}), 500
+
+    @app.route('/api/patients/<patient_id>/medical_record/<record_id>', methods=['PUT'])
+    @role_required(['Admin', 'Doctor'])
+    def update_medical_record(patient_id, record_id):
+        if not check_db():
+            return jsonify({"error": "Database error"}), 500
+
+        try:
+            data = clean_input_data(request.json or {})
+            title = data.get('title', '')
+            details = data.get('details', '')
+            if not title and not details:
+                return jsonify({"error": "Record title or details are required"}), 400
+
+            result = mongo.db.patient_records.update_one(
+                patient_record_query(patient_id, record_id, 'medical_record'),
+                {'$set': {
+                    'title': title or 'Medical Record',
+                    'details': details,
+                    'updated_at': datetime.utcnow(),
+                    'updated_by': session.get('username', 'System'),
+                }}
+            )
+            if result.matched_count == 0:
+                return jsonify({"error": "Medical record not found"}), 404
+            return jsonify({"message": "Medical record updated"})
+        except Exception as error:
+            return jsonify({"error": str(error)}), 500
+
+    @app.route('/api/patients/<patient_id>/medical_record/<record_id>', methods=['DELETE'])
+    @role_required(['Admin', 'Doctor'])
+    def delete_medical_record(patient_id, record_id):
+        if not check_db():
+            return jsonify({"error": "Database error"}), 500
+
+        try:
+            result = mongo.db.patient_records.update_one(
+                patient_record_query(patient_id, record_id, 'medical_record'),
+                {'$set': {
+                    'deleted_at': datetime.utcnow(),
+                    'deleted_by': session.get('username', 'System'),
+                }}
+            )
+            if result.matched_count == 0:
+                return jsonify({"error": "Medical record not found"}), 404
+            return jsonify({"message": "Medical record deleted"})
         except Exception as error:
             return jsonify({"error": str(error)}), 500

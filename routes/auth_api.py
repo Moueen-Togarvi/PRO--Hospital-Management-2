@@ -30,10 +30,15 @@ def register_auth_api_routes(
         if not check_db():
             return jsonify({"error": "Database error"}), 500
 
-        data = clean_input_data(request.json)
-        user = mongo.db.users.find_one({"username": data['username'], "deleted_at": {"$exists": False}})
+        data = clean_input_data(request.get_json(silent=True) or {})
+        username = data.get('username')
+        password = data.get('password')
+        if not username or not password:
+            return jsonify({"error": "Username and password are required"}), 400
 
-        if user and check_password_hash(user['password'], data['password']):
+        user = mongo.db.users.find_one({"username": username, "deleted_at": {"$exists": False}})
+
+        if user and user.get('password') and check_password_hash(user['password'], password):
             user_id = str(user['_id'])
             role = user['role']
 

@@ -2,16 +2,19 @@
 
 {% block content %}
 <section id="canteen-view" class="view-section -mx-4 -my-5 bg-[#f6fbf8] p-4 md:-mx-8 md:-my-8 md:p-8">
-  <div class="mb-6 flex items-center justify-between">
+  <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div>
       <h2 class="text-2xl font-bold text-green-900">
         <i class="fas fa-utensils mr-2"></i>Canteen Management
       </h2>
       <p class="mt-1 text-sm text-gray-500">Daily spending tracker with monthly totals</p>
     </div>
-    <div class="flex items-center gap-2">
-      <label class="text-sm font-medium text-gray-700">Month:</label>
-      <select id="canteen-month-select" class="rounded border px-3 py-2 text-sm">
+    <div class="flex w-full flex-wrap items-center gap-2 rounded-2xl border border-emerald-100 bg-white/90 p-2 shadow-sm shadow-emerald-100/60 md:w-auto">
+      <label class="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
+        <i class="fas fa-calendar-days text-emerald-600"></i>
+        <span>Month</span>
+      </label>
+      <select id="canteen-month-select" class="h-10 min-w-[9.5rem] rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-black text-slate-800 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100">
         <option value="1">January</option>
         <option value="2">February</option>
         <option value="3">March</option>
@@ -25,9 +28,10 @@
         <option value="11">November</option>
         <option value="12">December</option>
       </select>
-      <select id="canteen-year-select" class="rounded border px-3 py-2 text-sm"></select>
-      <button onclick="loadCanteenMonthlyTable()" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-700">
-        Load
+      <select id="canteen-year-select" class="h-10 min-w-[6.6rem] rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-black text-slate-800 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"></select>
+      <button onclick="loadCanteenMonthlyTable()" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:-translate-y-0.5 hover:from-emerald-700 hover:to-teal-700">
+        <i class="fas fa-rotate-right text-xs"></i>
+        <span>Load</span>
       </button>
     </div>
   </div>

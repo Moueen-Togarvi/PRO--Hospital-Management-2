@@ -6,6 +6,7 @@ function initAppLayout() {
   const closeBtn = document.getElementById('sidebar-close-btn');
   const backdrop = document.getElementById('sidebar-backdrop');
   const logoutButtons = document.querySelectorAll('[data-logout-button]');
+  const globalBackButton = document.getElementById('global-page-back');
 
   function openSidebar() {
     if (!sidebar) return;
@@ -42,6 +43,17 @@ function initAppLayout() {
   }
   if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
   if (backdrop) backdrop.addEventListener('click', closeSidebar);
+  if (globalBackButton) {
+    globalBackButton.addEventListener('click', () => {
+      const fallback = globalBackButton.dataset.fallback || '/dashboard';
+      const referrerUrl = document.referrer ? new URL(document.referrer) : null;
+      if (referrerUrl && referrerUrl.origin === window.location.origin && window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+      window.location.href = fallback;
+    });
+  }
 
   window.addEventListener('resize', () => {
     if (window.innerWidth >= 768) {

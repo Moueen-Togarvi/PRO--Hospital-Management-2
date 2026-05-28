@@ -317,10 +317,10 @@ async function loadEmergencyAlerts() {
 
   if (data.length === 0) {
     container.innerHTML = `
-      <div class="rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
-        <i class="fas fa-circle-check text-xl text-emerald-500"></i>
-        <p class="mt-1 text-xs font-black uppercase tracking-[0.18em] text-emerald-700">All Clear</p>
-        <p class="mt-1 text-xs font-medium text-slate-500">No active emergency alerts right now.</p>
+      <div class="rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-3 py-2 text-center">
+        <i class="fas fa-circle-check text-base text-emerald-500"></i>
+        <p class="mt-0.5 text-xs font-black uppercase tracking-[0.18em] text-emerald-700">All Clear</p>
+        <p class="mt-0.5 text-xs font-medium text-slate-500">No active emergency alerts right now.</p>
       </div>
     `;
     return;
@@ -329,11 +329,11 @@ async function loadEmergencyAlerts() {
   container.innerHTML = data.map((alert) => {
     const critical = alert.severity === 'critical';
     return `
-      <article class="${critical ? 'animate-pulse-red border-red-300 bg-red-50' : 'border-orange-200 bg-orange-50'} rounded-xl border px-4 py-3 shadow-sm">
+      <article class="${critical ? 'animate-pulse-red border-red-300 bg-red-50' : 'border-orange-200 bg-orange-50'} rounded-xl border px-3 py-2.5 shadow-sm">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <div class="flex items-center gap-2">
-              <span class="inline-flex h-9 w-9 items-center justify-center rounded-2xl ${critical ? 'bg-red-600' : 'bg-orange-500'} text-white">
+              <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl ${critical ? 'bg-red-600' : 'bg-orange-500'} text-white">
                 <i class="fas fa-triangle-exclamation"></i>
               </span>
               <div>
@@ -341,8 +341,8 @@ async function loadEmergencyAlerts() {
                 <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">${escapeHtml(alert.date || 'Just now')}</p>
               </div>
             </div>
-            <p class="mt-3 whitespace-pre-wrap text-sm font-semibold text-slate-700">${escapeHtml(alert.note || '')}</p>
-            <p class="mt-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">By ${escapeHtml(alert.added_by || 'Staff')}</p>
+            <p class="mt-2 whitespace-pre-wrap text-sm font-semibold text-slate-700">${escapeHtml(alert.note || '')}</p>
+            <p class="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">By ${escapeHtml(alert.added_by || 'Staff')}</p>
           </div>
           <button type="button" data-resolve-alert="${escapeHtml(alert._id)}" class="rounded-full bg-white/80 px-3 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700 shadow-sm hover:bg-white">
             Resolve

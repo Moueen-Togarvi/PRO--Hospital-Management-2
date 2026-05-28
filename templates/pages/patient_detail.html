@@ -1,52 +1,48 @@
 {% extends "base.html" %}
 
 {% block extra_styles %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/patient-detail.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/patient-detail.css', v='20260528-small-id') }}" />
 {% endblock %}
 
 {% block content %}
 <section class="space-y-8">
-  <div class="migration-banner">
-    <div>
-      <p class="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-500">Phase 3</p>
-      <h3 class="mt-1 text-xl font-black text-emerald-950">Patient detail is now a real page.</h3>
-      <p class="mt-2 max-w-3xl text-sm font-medium text-emerald-800/80">
-        Profile editing, notes, medical records, and call scheduling context are now handled here on the dedicated patient route.
-      </p>
-    </div>
-    <div class="flex flex-wrap gap-3">
-      <a href="/patients" class="app-secondary-btn whitespace-nowrap">
-        <i class="fas fa-arrow-left"></i>
-        <span>Back To Patients</span>
-      </a>
-    </div>
-  </div>
-
-  <section class="patient-detail-head panel-card p-6">
+  <section class="patient-detail-head panel-card patient-detail-head-compact">
     <div class="patient-detail-head-copy">
-      <p class="text-[11px] font-black uppercase tracking-[0.25em] text-emerald-500">Patient Profile</p>
-      <h2 id="patient-detail-title" class="mt-1 text-2xl font-black tracking-tight text-slate-950">Loading patient...</h2>
-      <p id="patient-detail-subtitle" class="mt-2 text-sm font-medium text-slate-500">Fetching patient information and activity records.</p>
+      <p class="patient-detail-kicker">Patient Profile</p>
+      <h2 id="patient-detail-title" class="patient-detail-title">Loading patient...</h2>
+      <p id="patient-detail-subtitle" class="patient-detail-subtitle">Fetching patient information and activity records.</p>
     </div>
     <div class="patient-detail-actions">
-      <button id="patient-print-btn" type="button" class="app-secondary-btn whitespace-nowrap">
+      <button id="patient-print-btn" type="button" class="patient-action-btn patient-action-print">
         <i class="fas fa-print"></i>
         <span>Print</span>
       </button>
-      <a id="patient-bill-preview-link" href="#" target="_blank" rel="noopener" class="app-secondary-btn whitespace-nowrap">
+      <a id="patient-bill-preview-link" href="#" target="_blank" rel="noopener" class="patient-action-btn patient-action-preview">
         <i class="fas fa-eye"></i>
         <span>Bill Preview</span>
       </a>
-      <button id="patient-save-btn" type="button" class="app-primary-btn whitespace-nowrap">
+      <button id="patient-session-notes-btn" type="button" class="patient-action-btn patient-action-session">
+        <i class="fas fa-notes-medical"></i>
+        <span>Session Notes</span>
+      </button>
+      <button id="patient-medical-records-btn" type="button" class="patient-action-btn patient-action-medical">
+        <i class="fas fa-file-medical"></i>
+        <span>Medical Records</span>
+      </button>
+      <button id="patient-save-btn" type="button" class="patient-action-btn patient-action-save">
         <i class="fas fa-save"></i>
         <span>Save Changes</span>
+      </button>
+      <button id="patient-delete-btn" type="button" class="patient-action-btn patient-action-delete">
+        <i class="fas fa-trash"></i>
+        <span>Delete</span>
       </button>
     </div>
   </section>
 
   <div class="patient-detail-grid">
-    <section class="panel-card p-6">
-      <form id="patient-details-form" class="space-y-6">
+    <section class="panel-card patient-form-card">
+      <form id="patient-details-form" class="patient-details-form-compact">
         <div class="detail-grid">
           <div>
             <label class="app-field-label" for="det-name">Patient Name</label>
@@ -137,7 +133,7 @@
 
         <section id="financial-settings-card" class="detail-financial-card">
           <div class="mb-4">
-            <p class="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-500">Financial Settings</p>
+            <p class="financial-card-kicker">Financial Settings</p>
             <h3 class="mt-1 text-lg font-black text-slate-950">Admin Controls</h3>
           </div>
           <div class="detail-grid">
@@ -169,62 +165,59 @@
     </section>
 
     <aside class="patient-detail-side">
-      <section class="panel-card p-6">
-        <p class="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-500">Snapshot</p>
-        <div id="patient-summary-card" class="mt-4 space-y-3"></div>
+      <section class="panel-card patient-side-card">
+        <p class="patient-side-kicker">Snapshot</p>
+        <div id="patient-summary-card" class="patient-summary-list"></div>
       </section>
 
-      <section id="call-info-panel" class="panel-card p-6">
+      <section id="call-info-panel" class="panel-card patient-side-card">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="text-[11px] font-black uppercase tracking-[0.22em] text-emerald-500">Weekly Call</p>
-            <h3 class="mt-1 text-lg font-black text-slate-950">Call Day Calendar</h3>
+            <p class="patient-side-kicker">Weekly Call</p>
+            <h3 class="patient-side-title">Call Day Calendar</h3>
           </div>
-          <span class="rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">Active</span>
+          <span class="patient-side-pill">Active</span>
         </div>
-        <div id="next-call-display" class="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4"></div>
-        <div class="mt-4">
-          <div class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Current Month</div>
-          <div id="mini-calendar" class="calendar-grid mt-3"></div>
+        <div id="next-call-display" class="next-call-card"></div>
+        <div class="mt-3">
+          <div class="patient-side-label">Current Month</div>
+          <div id="mini-calendar" class="calendar-grid mt-2"></div>
         </div>
       </section>
     </aside>
   </div>
-
-  <section class="panel-card p-6">
-    <div class="detail-tabs">
-      <button id="notes-tab-btn" type="button" class="detail-tab active" data-tab="notes">Session Notes</button>
-      <button id="records-tab-btn" type="button" class="detail-tab" data-tab="records">Medical Records</button>
-    </div>
-
-    <div id="tab-notes" class="mt-6 detail-tab-panel">
-      <div id="session-notes-list" class="record-list"></div>
-      <form id="session-note-form" class="record-form mt-4">
-        <input id="new-session-note-input" class="app-field" placeholder="Add psychology / counseling note..." />
-        <button class="app-primary-btn whitespace-nowrap" type="submit">
-          <i class="fas fa-plus"></i>
-          <span>Add Note</span>
-        </button>
-      </form>
-      <p id="session-note-permission" class="mt-3 hidden text-sm font-semibold text-amber-700">Only Admin and Psychologist roles can add session notes.</p>
-    </div>
-
-    <div id="tab-med" class="mt-6 detail-tab-panel hidden">
-      <div id="medical-records-list" class="record-list"></div>
-      <form id="medical-record-form" class="record-form-stacked mt-4">
-        <input id="new-med-title" class="app-field" placeholder="Record title" />
-        <textarea id="new-med-details" class="app-field patient-textarea" placeholder="Record details"></textarea>
-        <div>
-          <button class="app-primary-btn whitespace-nowrap" type="submit">
-            <i class="fas fa-plus"></i>
-            <span>Add Medical Record</span>
-          </button>
-        </div>
-      </form>
-      <p id="medical-record-permission" class="mt-3 hidden text-sm font-semibold text-amber-700">Only Admin and Doctor roles can add medical records.</p>
-    </div>
-  </section>
 </section>
+
+<div id="patient-records-modal" class="records-modal hidden" aria-hidden="true">
+  <div class="records-modal-card">
+    <div class="records-modal-head">
+      <div>
+        <p id="records-modal-kicker" class="patient-side-kicker">Records</p>
+        <h3 id="records-modal-title" class="records-modal-title">Patient Records</h3>
+      </div>
+      <button id="records-modal-close" type="button" class="records-icon-btn" aria-label="Close records modal">
+        <i class="fas fa-xmark"></i>
+      </button>
+    </div>
+
+    <div id="records-modal-list" class="records-modal-list"></div>
+
+    <form id="records-modal-form" class="records-modal-form">
+      <input id="records-modal-title-input" class="app-field records-title-input" placeholder="Record title" />
+      <textarea id="records-modal-text-input" class="app-field records-text-input" placeholder="Write note details..."></textarea>
+      <p id="records-modal-permission" class="records-permission hidden"></p>
+      <div class="records-modal-actions">
+        <button id="records-modal-cancel-edit" type="button" class="records-secondary-action hidden">
+          Cancel Edit
+        </button>
+        <button id="records-modal-save" type="submit" class="records-primary-action">
+          <i class="fas fa-plus"></i>
+          <span>Add Record</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <div id="printable-area" class="hidden">
   <div class="print-container">
@@ -276,5 +269,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-  <script src="{{ url_for('static', filename='js/pages/patient-detail.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pages/patient-detail.js', v='20260528-small-id') }}"></script>
 {% endblock %}

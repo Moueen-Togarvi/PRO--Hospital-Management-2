@@ -14,6 +14,7 @@ def register_patient_page_routes(app, page_context):
             body_class="min-h-screen bg-slate-50 text-slate-900",
             app_shell=True,
             current_page="patients",
+            back_url="/dashboard",
             current_user=user,
             app_context={
                 "currentPage": "patients",
@@ -33,6 +34,7 @@ def register_patient_page_routes(app, page_context):
             body_class="min-h-screen bg-slate-50 text-slate-900",
             app_shell=True,
             current_page="patients",
+            back_url="/patients",
             current_user=user,
             app_context={
                 "currentPage": "patient-detail",

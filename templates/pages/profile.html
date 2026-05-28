@@ -21,20 +21,8 @@
           <input id="profile-name" class="app-field" maxlength="120" required />
         </label>
         <label class="block">
-          <span class="app-field-label">Short Mark</span>
-          <input id="profile-short-name" class="app-field" maxlength="24" required />
-        </label>
-        <label class="block">
           <span class="app-field-label">System Name</span>
           <input id="profile-system-name" class="app-field" maxlength="80" required />
-        </label>
-        <label class="block">
-          <span class="app-field-label">Topbar Label</span>
-          <input id="profile-header-label" class="app-field" maxlength="40" required />
-        </label>
-        <label class="block">
-          <span class="app-field-label">Phase Label</span>
-          <input id="profile-phase-label" class="app-field" maxlength="32" required />
         </label>
         <label class="block">
           <span class="app-field-label">Owner Name</span>
@@ -59,10 +47,6 @@
         <label class="block">
           <span class="app-field-label">Address</span>
           <input id="profile-address" class="app-field" maxlength="180" required />
-        </label>
-        <label class="block md:col-span-2">
-          <span class="app-field-label">Logo URL</span>
-          <input id="profile-logo-url" class="app-field" />
         </label>
         <label class="block md:col-span-2">
           <span class="app-field-label">Upload Logo</span>
@@ -117,5 +101,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-  <script src="{{ url_for('static', filename='js/pages/profile.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pages/profile.js', v='20260528-profile-fields') }}"></script>
 {% endblock %}
