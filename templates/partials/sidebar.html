@@ -28,6 +28,19 @@
         <span>Dashboard</span>
       </a>
       {% endif %}
+      {% if current_user.role in ['Admin', 'Reception', 'Doctor', 'Nurse', 'Lab', 'Radiology', 'Pharmacy', 'Accountant'] %}
+      <a href="/hospital/beds" class="nav-link {% if current_page == 'hospital' %}active{% endif %}">
+        <i class="fas fa-hospital w-5 text-center"></i>
+        <span>General HMS</span>
+      </a>
+      {% if current_page == 'hospital' %}
+      <div class="ml-7 space-y-1 pb-1 pt-0.5">
+        <a href="/hospital/beds" class="block rounded-lg px-3 py-2 text-xs font-black {% if hospital_section == 'beds' %}bg-emerald-50 text-emerald-800{% else %}text-slate-600 hover:bg-slate-50{% endif %}">Beds</a>
+        <a href="/hospital/admissions" class="block rounded-lg px-3 py-2 text-xs font-black {% if hospital_section == 'admissions' %}bg-emerald-50 text-emerald-800{% else %}text-slate-600 hover:bg-slate-50{% endif %}">Admissions</a>
+        <a href="/hospital/clinical" class="block rounded-lg px-3 py-2 text-xs font-black {% if hospital_section == 'clinical' %}bg-emerald-50 text-emerald-800{% else %}text-slate-600 hover:bg-slate-50{% endif %}">Clinical</a>
+      </div>
+      {% endif %}
+      {% endif %}
       {% if current_user.role == 'Family' %}
       <a href="/family-dashboard" class="nav-link {% if current_page == 'family-dashboard' %}active{% endif %}">
         <i class="fas fa-user-friends w-5 text-center"></i>

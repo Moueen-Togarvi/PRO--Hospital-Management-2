@@ -214,11 +214,9 @@ async function updateDashboard() {
   try {
     const isAdmin = dashboardState.currentUser.role === 'Admin';
     const incomeCard = document.getElementById('dash-income-card');
-    const canteenCard = document.getElementById('dash-canteen-card');
     const callMeetingSection = document.getElementById('dash-call-meeting-section');
 
     if (incomeCard) incomeCard.style.display = isAdmin ? '' : 'none';
-    if (canteenCard) canteenCard.style.display = isAdmin ? '' : 'none';
     if (callMeetingSection) callMeetingSection.style.display = isAdmin ? '' : 'none';
 
     const { response, data } = await window.apiFetchJson('/api/dashboard');
@@ -228,16 +226,16 @@ async function updateDashboard() {
     const totalEl = document.getElementById('dash-total');
     const admittedEl = document.getElementById('dash-admitted');
     const dischargedEl = document.getElementById('dash-discharged');
-    const psychEl = document.getElementById('dash-psy-sessions');
-    const canteenSalesEl = document.getElementById('dash-canteen-sales');
     const monthEl = document.getElementById('dash-month-label');
+    const hmsIpdEl = document.getElementById('dash-hms-ipd');
+    const hmsOccupiedBedsEl = document.getElementById('dash-hms-occupied-beds');
 
     if (totalEl) totalEl.innerText = formatNumber(data.totalPatients);
     if (admittedEl) admittedEl.innerText = formatNumber(data.admissionsThisMonth || 0);
     if (dischargedEl) dischargedEl.innerText = formatNumber(data.dischargesThisMonth || 0);
-    if (psychEl) psychEl.innerText = formatNumber(data.totalPsychSessionsToday || 0);
-    if (canteenSalesEl) canteenSalesEl.innerText = formatCurrency(data.totalCanteenSalesThisMonth || 0);
     if (monthEl) monthEl.innerText = monthLabel;
+    if (hmsIpdEl) hmsIpdEl.innerText = formatNumber(data.activeIpd || 0);
+    if (hmsOccupiedBedsEl) hmsOccupiedBedsEl.innerText = formatNumber(data.occupiedBeds || 0);
   } catch (error) {
     console.error('Dashboard Error', error);
   }

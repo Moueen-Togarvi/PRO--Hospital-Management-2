@@ -31,6 +31,8 @@ from routes.export_page import register_export_page_routes
 from routes.family_api import register_family_api_routes
 from routes.family_dashboard_page import register_family_dashboard_page_routes
 from routes.finance_api import register_finance_api_routes
+from routes.general_hms_api import register_general_hms_api_routes
+from routes.hospital_page import register_hospital_page_routes
 from routes.monthly_overheads_page import register_monthly_overheads_page_routes
 from routes.overheads_api import register_overheads_api_routes
 from routes.overheads_page import register_overheads_page_routes
@@ -197,6 +199,21 @@ def create_indices():
 
             # App settings indices
             mongo.db.app_settings.create_index([("key", 1)], unique=True)
+
+            # General HMS indices
+            mongo.db.appointments.create_index([("date", 1), ("status", 1)])
+            mongo.db.opd_visits.create_index([("patient_id", 1), ("date", -1)])
+            mongo.db.ipd_admissions.create_index([("patient_id", 1), ("status", 1)])
+            mongo.db.beds.create_index([("ward_id", 1), ("room_id", 1), ("status", 1)])
+            mongo.db.vitals.create_index([("patient_id", 1), ("created_at", -1)])
+            mongo.db.nursing_notes.create_index([("patient_id", 1), ("created_at", -1)])
+            mongo.db.lab_orders.create_index([("patient_id", 1), ("status", 1)])
+            mongo.db.radiology_orders.create_index([("patient_id", 1), ("status", 1)])
+            mongo.db.pharmacy_items.create_index([("name", 1)])
+            mongo.db.stock_ledger.create_index([("medicine_id", 1), ("date", -1)])
+            mongo.db.invoices.create_index([("patient_id", 1), ("status", 1)])
+            mongo.db.cash_closings.create_index([("date", -1)])
+            mongo.db.audit_logs.create_index([("timestamp", -1)])
             
             print("Database indices verified/created.")
         except Exception as e:
@@ -211,6 +228,35 @@ with app.app_context():
 @app.context_processor
 def inject_site_profile():
     return {"site_profile": get_site_profile(mongo)}
+
+
+@app.after_request
+def audit_mutating_api_request(response):
+    if request.method not in {"POST", "PUT", "DELETE"}:
+        return response
+    if not request.path.startswith("/api/"):
+        return response
+    if request.path.startswith("/api/auth/"):
+        return response
+    if mongo is None:
+        return response
+
+    try:
+        mongo.db.audit_logs.insert_one({
+            "timestamp": datetime.utcnow(),
+            "user_id": get_current_user_id() or "",
+            "username": session.get("username", ""),
+            "role": session.get("role", ""),
+            "method": request.method,
+            "path": request.path,
+            "status_code": response.status_code,
+            "action": "api_mutation",
+            "module": request.path.split("/")[2] if len(request.path.split("/")) > 2 else "api",
+            "document_id": request.view_args.get("id") if request.view_args else "",
+        })
+    except Exception as error:
+        print(f"Global audit log failed: {error}")
+    return response
 
 # ── APScheduler (only in main process, not werkzeug reloader child) ───────────
 _scheduler = None
@@ -452,6 +498,15 @@ register_finance_api_routes(
     calculate_prorated_fee,
     get_current_user_id,
 )
+register_general_hms_api_routes(
+    app,
+    mongo,
+    check_db,
+    clean_input_data,
+    role_required,
+    get_current_user_id,
+)
+register_hospital_page_routes(app, page_context)
 register_monthly_overheads_page_routes(app, page_context)
 register_overheads_api_routes(
     app,

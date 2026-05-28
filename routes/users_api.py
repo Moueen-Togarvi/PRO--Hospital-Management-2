@@ -38,7 +38,11 @@ def register_user_api_routes(
         if not all(key in data for key in ['username', 'password', 'role', 'name', 'email']):
             return jsonify({"error": "Missing fields"}), 400
 
-        allowed_roles = {'Admin', 'Doctor', 'Psychologist', 'Canteen', 'General Staff', 'Family'}
+        allowed_roles = {
+            'Admin', 'Reception', 'Doctor', 'Nurse', 'Lab', 'Radiology',
+            'Pharmacy', 'Accountant', 'Psychologist', 'Canteen',
+            'General Staff', 'Family'
+        }
         if data.get('role') not in allowed_roles:
             return jsonify({"error": "Invalid role"}), 400
 
@@ -106,7 +110,11 @@ def register_user_api_routes(
             if not username or not role or not name:
                 return jsonify({"error": "Name, username and role are required"}), 400
 
-            allowed_roles = {'Admin', 'Doctor', 'Psychologist', 'Canteen', 'General Staff', 'Family'}
+            allowed_roles = {
+                'Admin', 'Reception', 'Doctor', 'Nurse', 'Lab', 'Radiology',
+                'Pharmacy', 'Accountant', 'Psychologist', 'Canteen',
+                'General Staff', 'Family'
+            }
             if role not in allowed_roles:
                 return jsonify({"error": "Invalid role"}), 400
 

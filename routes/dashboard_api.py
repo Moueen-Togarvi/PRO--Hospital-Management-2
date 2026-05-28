@@ -99,6 +99,18 @@ def register_dashboard_api_routes(
             total_psych_sessions_today = mongo.db.psych_sessions.count_documents({
                 'date': {'$gte': today_start, '$lt': today_end}
             })
+            active_ipd = mongo.db.ipd_admissions.count_documents({
+                'deleted_at': {'$exists': False},
+                'status': 'Admitted',
+            })
+            free_beds = mongo.db.beds.count_documents({
+                'deleted_at': {'$exists': False},
+                'status': 'Available',
+            })
+            occupied_beds = mongo.db.beds.count_documents({
+                'deleted_at': {'$exists': False},
+                'status': 'Occupied',
+            })
 
             return jsonify({
                 'totalPatients': total_patients,
@@ -107,7 +119,10 @@ def register_dashboard_api_routes(
                 'totalExpectedBalance': total_expected_balance,
                 'totalCanteenSalesThisMonth': total_canteen_sales_this_month,
                 'totalExpensesThisMonth': total_expenses_this_month,
-                'totalPsychSessionsToday': total_psych_sessions_today
+                'totalPsychSessionsToday': total_psych_sessions_today,
+                'activeIpd': active_ipd,
+                'freeBeds': free_beds,
+                'occupiedBeds': occupied_beds,
             })
         except Exception as error:
             print(f"DB Metric Error: {error}")

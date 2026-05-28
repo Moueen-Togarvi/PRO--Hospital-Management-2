@@ -6,6 +6,16 @@ class PageContext:
         self.mongo = mongo
         self.object_id_cls = object_id_cls
         self.dashboard_roles = {"Admin", "Doctor", "Psychologist", "Canteen", "Staff"}
+        self.hospital_page_roles = {
+            "Admin",
+            "Reception",
+            "Doctor",
+            "Nurse",
+            "Lab",
+            "Radiology",
+            "Pharmacy",
+            "Accountant",
+        }
         self.admission_page_roles = {"Admin"}
         self.patient_page_roles = {"Admin"}
         self.patient_detail_roles = {"Admin", "Doctor", "Psychologist"}
@@ -66,6 +76,8 @@ class PageContext:
 
     def home_endpoint_for(self, user):
         role = (user or {}).get("role") or session.get("role")
+        if role in self.hospital_page_roles:
+            return "hospital_page"
         if role in self.dashboard_roles:
             return "dashboard_page"
         if role in self.family_dashboard_page_roles:

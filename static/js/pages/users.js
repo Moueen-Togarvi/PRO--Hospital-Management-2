@@ -3,7 +3,7 @@ let patientsCache = [];
 let userModalMode = 'create';
 let userPatientSelection = new Set();
 
-const USER_ROLES = ['Admin', 'Doctor', 'Psychologist', 'Canteen', 'General Staff', 'Family'];
+const USER_ROLES = ['Admin', 'Reception', 'Doctor', 'Nurse', 'Lab', 'Radiology', 'Pharmacy', 'Accountant', 'Psychologist', 'Canteen', 'General Staff', 'Family'];
 
 function showSuccessModal(message, isError = false) {
   if (typeof window.showToast === 'function') {
@@ -38,7 +38,13 @@ function normalizeRole(role = '') {
 function getRoleBadge(role = '') {
   const styles = {
     Admin: 'border-blue-100 bg-blue-50 text-blue-800',
+    Reception: 'border-cyan-100 bg-cyan-50 text-cyan-800',
     Doctor: 'border-violet-100 bg-violet-50 text-violet-800',
+    Nurse: 'border-rose-100 bg-rose-50 text-rose-800',
+    Lab: 'border-sky-100 bg-sky-50 text-sky-800',
+    Radiology: 'border-fuchsia-100 bg-fuchsia-50 text-fuchsia-800',
+    Pharmacy: 'border-teal-100 bg-teal-50 text-teal-800',
+    Accountant: 'border-lime-100 bg-lime-50 text-lime-800',
     Psychologist: 'border-indigo-100 bg-indigo-50 text-indigo-800',
     Canteen: 'border-amber-100 bg-amber-50 text-amber-800',
     'General Staff': 'border-slate-200 bg-slate-100 text-slate-800',
@@ -66,7 +72,7 @@ async function fetchPatients() {
 function updateUserStats(users = usersCache) {
   const total = users.length;
   const admins = users.filter((user) => user.role === 'Admin').length;
-  const staff = users.filter((user) => ['Doctor', 'Psychologist', 'Canteen', 'General Staff'].includes(user.role)).length;
+  const staff = users.filter((user) => ['Reception', 'Doctor', 'Nurse', 'Lab', 'Radiology', 'Pharmacy', 'Accountant', 'Psychologist', 'Canteen', 'General Staff'].includes(user.role)).length;
   const family = users.filter((user) => user.role === 'Family').length;
 
   const statMap = {

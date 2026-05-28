@@ -202,38 +202,35 @@
     </div>
 
     <div
-      class="group relative cursor-pointer overflow-hidden rounded-xl border border-rose-200 bg-rose-50 p-3 shadow-sm transition-all duration-300 hover:bg-rose-100"
-      onclick="window.navigateTo('psych-sessions-view')">
+      class="group relative cursor-pointer overflow-hidden rounded-xl border border-blue-200 bg-blue-50 p-3 shadow-sm transition-all duration-300 hover:bg-blue-100"
+      onclick="window.location.href='/hospital/admissions'">
       <div class="relative z-10 flex h-full flex-col justify-between">
         <div class="flex items-center justify-between">
-          <span class="text-[9px] font-extrabold uppercase tracking-[0.2em] text-rose-600">Sessions</span>
-          <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500 text-white">
-            <i class="fas fa-brain text-xs"></i>
+          <span class="text-[9px] font-extrabold uppercase tracking-[0.2em] text-blue-700">HMS</span>
+          <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white">
+            <i class="fas fa-hospital-user text-xs"></i>
           </div>
         </div>
         <div class="mt-2">
-          <div class="flex items-baseline gap-1">
-            <div class="text-xl font-black text-rose-800" id="dash-psy-sessions">0</div>
-            <div class="text-[8px] font-black uppercase text-rose-400">Today</div>
-          </div>
-          <div class="mt-0.5 text-[10px] font-bold text-rose-600">Psychology Sessions</div>
+          <div class="text-xl font-black text-blue-900" id="dash-hms-ipd">0</div>
+          <div class="mt-0.5 text-[10px] font-bold text-blue-700">Active IPD</div>
         </div>
       </div>
     </div>
 
-    <div id="dash-canteen-card"
-      class="group relative cursor-pointer overflow-hidden rounded-xl border border-sky-200 bg-sky-50 p-3 shadow-sm transition-all duration-300 hover:bg-sky-100"
-      onclick="window.navigateTo('canteen-view')">
+    <div
+      class="group relative cursor-pointer overflow-hidden rounded-xl border border-red-200 bg-red-50 p-3 shadow-sm transition-all duration-300 hover:bg-red-100"
+      onclick="window.location.href='/hospital/beds'">
       <div class="relative z-10 flex h-full flex-col justify-between">
         <div class="flex items-center justify-between">
-          <span class="text-[9px] font-extrabold uppercase tracking-[0.2em] text-sky-600">Canteen</span>
-          <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500 text-white">
-            <i class="fas fa-utensils text-xs"></i>
+          <span class="text-[9px] font-extrabold uppercase tracking-[0.2em] text-red-700">Beds</span>
+          <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-red-600 text-white">
+            <i class="fas fa-procedures text-xs"></i>
           </div>
         </div>
         <div class="mt-2">
-          <div class="text-xl font-black text-sky-900" id="dash-canteen-sales">PKR 0</div>
-          <div class="mt-0.5 text-[10px] font-bold text-sky-700">Monthly Sales</div>
+          <div class="text-xl font-black text-red-900" id="dash-hms-occupied-beds">0</div>
+          <div class="mt-0.5 text-[10px] font-bold text-red-700">Occupied Beds</div>
         </div>
       </div>
     </div>
@@ -450,5 +447,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-  <script src="{{ url_for('static', filename='js/pages/dashboard.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pages/dashboard.js', v='20260528-hms-cards') }}"></script>
 {% endblock %}
