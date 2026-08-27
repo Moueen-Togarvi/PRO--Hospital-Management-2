@@ -62,6 +62,26 @@ def register_general_hms_api_routes(
         )
         return f"{prefix}-{datetime.utcnow().strftime('%y%m')}-{int(counter.get('seq', 1)):04d}"
 
+    _SENSITIVE_PAYLOAD_KEYS = {
+        "name", "patient_name", "fathername", "guardianname", "guardian_name",
+        "cnic", "contactno", "contact_no", "phone", "guardianphone", "guardian_phone",
+        "address", "email", "password", "note", "notes", "vitals", "report_text",
+        "details", "text", "diet_status", "mood", "behavior",
+    }
+
+    def _redact_payload(value):
+        """Strip likely-PII values from an audit payload before it's stored,
+        so the audit trail records *that* a field changed without keeping a
+        second unredacted copy of patient data at rest."""
+        if isinstance(value, dict):
+            return {
+                key: ("[REDACTED]" if key.lower() in _SENSITIVE_PAYLOAD_KEYS else _redact_payload(val))
+                for key, val in value.items()
+            }
+        if isinstance(value, list):
+            return [_redact_payload(item) for item in value]
+        return value
+
     def log_audit(action, module, document_id="", payload=None):
         try:
             mongo.db.audit_logs.insert_one({
@@ -74,7 +94,7 @@ def register_general_hms_api_routes(
                 "action": action,
                 "module": module,
                 "document_id": str(document_id or ""),
-                "payload": payload or {},
+                "payload": _redact_payload(payload or {}),
             })
         except Exception as error:
             print(f"HMS audit log failed: {error}")

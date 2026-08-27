@@ -2,8 +2,8 @@ from flask import redirect, render_template, url_for
 from routes.page_context import PageContext
 
 
-def register_page_routes(app, mongo, object_id_cls):
-    page_context = PageContext(mongo, object_id_cls)
+def register_page_routes(app, mongo):
+    page_context = PageContext(mongo)
 
     @app.route("/")
     def root_page():

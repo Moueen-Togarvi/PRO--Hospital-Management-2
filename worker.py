@@ -25,6 +25,7 @@ def task_send_billing(patient_id: str, phone_number: str, month_year: str):
     Queued by the monthly_billing scheduler job.
     """
     from db import Mongo, ObjectId
+    from utils import patient_financial_summary
 
     db = Mongo().db
 
@@ -34,61 +35,13 @@ def task_send_billing(patient_id: str, phone_number: str, month_year: str):
             logger.warning(f"[task_send_billing] Patient {patient_id} not found")
             return False
 
-        # Calculate financial summary
-        from datetime import datetime
-        from db import ObjectId as OID
-
-        admission_date = patient.get('admissionDate')
-        days_elapsed = 0
-        if admission_date:
-            try:
-                if isinstance(admission_date, str):
-                    from datetime import datetime as dt
-                    admission_dt = dt.fromisoformat(admission_date.replace('Z', '+00:00'))
-                else:
-                    admission_dt = admission_date
-                days_elapsed = max(0, (datetime.now() - admission_dt.replace(tzinfo=None)).days)
-            except Exception:
-                days_elapsed = 0
-
-        # Monthly fee (prorated)
-        try:
-            monthly_fee_raw = int(str(patient.get('monthlyFee', '0')).replace(',', '') or '0')
-        except Exception:
-            monthly_fee_raw = 0
-        per_day = monthly_fee_raw / 30.0
-        prorated_fee = int(per_day * max(days_elapsed, 1))
-
-        # Canteen total
         canteen_agg = list(db.canteen_sales.aggregate([
-            {'$match': {'patient_id': OID(patient_id)}},
+            {'$match': {'patient_id': ObjectId(patient_id)}},
             {'$group': {'_id': None, 'total': {'$sum': '$amount'}}}
         ]))
         canteen_total = canteen_agg[0]['total'] if canteen_agg else 0
-
-        # Laundry
-        laundry = patient.get('laundryAmount', 0) if patient.get('laundryStatus') else 0
-
-        # Received
-        try:
-            received = int(str(patient.get('receivedAmount', '0')).replace(',', '') or '0')
-        except Exception:
-            received = 0
-
-        total_charges = prorated_fee + canteen_total + laundry
-        balance_due = total_charges - received
-
-        financial = {
-            'month_year': month_year,
-            'days_elapsed': days_elapsed,
-            'monthly_fee': monthly_fee_raw,
-            'prorated_fee': prorated_fee,
-            'canteen_total': canteen_total,
-            'laundry_amount': laundry,
-            'total_charges': total_charges,
-            'received_amount': received,
-            'balance_due': balance_due,
-        }
+        financial = patient_financial_summary(patient, canteen_total, month_year=month_year)
+        balance_due = financial['balance_due']
 
         # Serialize patient for template
         patient_data = {

@@ -3,6 +3,7 @@ import io
 
 import pandas as pd
 from flask import jsonify, request, send_file, session
+from utils import safe_int_amount
 
 
 def register_dashboard_api_routes(
@@ -70,8 +71,7 @@ def register_dashboard_api_routes(
                     fee = calculate_prorated_fee(fee_str, days_elapsed)
                     canteen = canteen_map.get(pid, 0)
                     laundry = patient.get('laundryAmount', 0) if patient.get('laundryStatus', False) else 0
-                    received_str = str(patient.get('receivedAmount', '0')).replace(',', '')
-                    received = int(received_str or '0')
+                    received = safe_int_amount(patient.get('receivedAmount'))
                     balance = fee + canteen + laundry - received
                     total_expected_balance += max(0, balance)
                 except (ValueError, TypeError) as error:

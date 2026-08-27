@@ -4,6 +4,8 @@ from datetime import datetime
 import pandas as pd
 from db import ObjectId
 from flask import jsonify, make_response, request, send_file, session
+from utils import patient_financial_summary
+from utils import safe_int_amount as _safe_int_amount
 
 
 def _object_id_or_none(raw_id):
@@ -34,13 +36,6 @@ def _build_payment_record_note(existing_note, patient_name, payment_method):
     if existing_note.startswith('Partial payment from '):
         return f"Partial payment from {patient_name} via {payment_method}{large_amount_suffix}"
     return f"Payment from {patient_name} via {payment_method}{large_amount_suffix}"
-
-
-def _safe_int_amount(raw_val):
-    try:
-        return int(float(str(raw_val or '0').replace(',', '').strip() or '0'))
-    except Exception:
-        return 0
 
 
 def _serialize_manual_receipt(doc):
@@ -1173,43 +1168,12 @@ def register_finance_api_routes(
                 if ObjectId(id) not in user.get('patient_ids', []):
                     return "Unauthorized: You do not have access to this patient's bill", 403
 
-            admission_date = patient.get('admissionDate')
-            days_elapsed = 0
-            if admission_date:
-                try:
-                    if isinstance(admission_date, str):
-                        admission_dt = datetime.fromisoformat(admission_date.replace('Z', '+00:00'))
-                    else:
-                        admission_dt = admission_date
-                    days_elapsed = max(0, (datetime.now() - admission_dt.replace(tzinfo=None)).days)
-                except Exception:
-                    days_elapsed = 0
-
-            monthly_fee_raw = int(str(patient.get('monthlyFee', '0')).replace(',', '') or '0')
-            prorated_fee = int((monthly_fee_raw / 30.0) * max(days_elapsed, 1))
-
             canteen_agg = list(mongo.db.canteen_sales.aggregate([
                 {'$match': {'patient_id': ObjectId(id)}},
                 {'$group': {'_id': None, 'total': {'$sum': '$amount'}}}
             ]))
             canteen_total = canteen_agg[0]['total'] if canteen_agg else 0
-            laundry = patient.get('laundryAmount', 0) if patient.get('laundryStatus') else 0
-            received = int(str(patient.get('receivedAmount', '0')).replace(',', '') or '0')
-
-            total_charges = prorated_fee + canteen_total + laundry
-            balance_due = total_charges - received
-
-            financial = {
-                'month_year': datetime.now().strftime('%B %Y'),
-                'days_elapsed': days_elapsed,
-                'monthly_fee': monthly_fee_raw,
-                'prorated_fee': prorated_fee,
-                'canteen_total': canteen_total,
-                'laundry_amount': laundry,
-                'total_charges': total_charges,
-                'received_amount': received,
-                'balance_due': balance_due,
-            }
+            financial = patient_financial_summary(patient, canteen_total, month_year=datetime.now().strftime('%B %Y'))
 
             patient_data = {
                 '_id': str(patient['_id']),

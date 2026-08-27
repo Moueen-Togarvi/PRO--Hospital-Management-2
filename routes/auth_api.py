@@ -1,12 +1,17 @@
+import hmac
 import os
 import random
 import string
+import uuid
 from datetime import datetime, timedelta
 
 import jwt
 from db import ObjectId
 from flask import jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
+
+OTP_TTL_SECONDS = 300
+REFRESH_TOKEN_DAYS = 7
 
 
 def register_auth_api_routes(
@@ -21,8 +26,47 @@ def register_auth_api_routes(
     send_password_reset_email,
     get_current_user_id,
     login_required,
+    redis_conn,
 ):
-    otp_store = {}
+    def _otp_key(user_id):
+        return f"otp:{user_id}"
+
+    def store_otp(user_id, otp):
+        redis_conn.setex(_otp_key(user_id), OTP_TTL_SECONDS, otp)
+
+    def get_otp(user_id):
+        value = redis_conn.get(_otp_key(user_id))
+        return value.decode() if value else None
+
+    def clear_otp(user_id):
+        redis_conn.delete(_otp_key(user_id))
+
+    def _refresh_key(jti):
+        return f"refresh_token:{jti}"
+
+    def issue_tokens(user_id, role):
+        access_token = jwt.encode({
+            'user_id': user_id,
+            'role': role,
+            'exp': datetime.utcnow() + timedelta(minutes=15)
+        }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+
+        jti = str(uuid.uuid4())
+        refresh_token = jwt.encode({
+            'user_id': user_id,
+            'jti': jti,
+            'exp': datetime.utcnow() + timedelta(days=REFRESH_TOKEN_DAYS)
+        }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+        redis_conn.setex(_refresh_key(jti), timedelta(days=REFRESH_TOKEN_DAYS), user_id)
+
+        return access_token, refresh_token
+
+    def set_refresh_cookie(response, refresh_token):
+        response.set_cookie(
+            'refresh_token', refresh_token,
+            httponly=True, secure=app.config.get('SESSION_COOKIE_SECURE', True), samesite='Strict',
+            max_age=REFRESH_TOKEN_DAYS * 24 * 3600,
+        )
 
     def serialize_account_user(user):
         return {
@@ -65,8 +109,7 @@ def register_auth_api_routes(
                 phone = str(user.get('phone') or user.get('contactNo') or '').strip()
                 if phone:
                     otp = ''.join(random.choices(string.digits, k=6))
-                    expires_at = datetime.now() + timedelta(minutes=5)
-                    otp_store[user_id] = {'otp': otp, 'expires_at': expires_at}
+                    store_otp(user_id, otp)
                     task_queue.enqueue(
                         'services.whatsapp.send_otp',
                         phone_number=phone,
@@ -84,16 +127,7 @@ def register_auth_api_routes(
             session['username'] = user['username']
             session['role'] = user['role']
 
-            access_token = jwt.encode({
-                'user_id': user_id,
-                'role': user['role'],
-                'exp': datetime.utcnow() + timedelta(minutes=15)
-            }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
-
-            refresh_token = jwt.encode({
-                'user_id': user_id,
-                'exp': datetime.utcnow() + timedelta(days=7)
-            }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+            access_token, refresh_token = issue_tokens(user_id, user['role'])
 
             response = jsonify({
                 "message": "Login successful",
@@ -103,7 +137,7 @@ def register_auth_api_routes(
                 "user_id": user_id,
                 "access_token": access_token
             })
-            response.set_cookie('refresh_token', refresh_token, httponly=True, secure=True, samesite='Strict')
+            set_refresh_cookie(response, refresh_token)
             return response
 
         return jsonify({"error": "Invalid credentials"}), 401
@@ -117,6 +151,10 @@ def register_auth_api_routes(
         try:
             payload = jwt.decode(refresh_token_value, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
             user_id = payload.get('user_id')
+            jti = payload.get('jti')
+
+            if not jti or not redis_conn.get(_refresh_key(jti)):
+                return jsonify({"error": "Refresh token revoked or invalid"}), 401
 
             user = mongo.db.users.find_one({"_id": ObjectId(user_id), "deleted_at": {"$exists": False}})
             if not user:
@@ -135,6 +173,7 @@ def register_auth_api_routes(
             return jsonify({"error": "Invalid refresh token"}), 401
 
     @app.route('/api/auth/forgot', methods=['POST'])
+    @limiter.limit("5 per hour")
     def forgot_password():
         if not check_db():
             return jsonify({"error": "Database error"}), 500
@@ -168,6 +207,7 @@ def register_auth_api_routes(
         return jsonify({"message": "Reset email sent to your registered address."})
 
     @app.route('/api/auth/reset', methods=['POST'])
+    @limiter.limit("10 per hour")
     def reset_password():
         if not check_db():
             return jsonify({"error": "Database error"}), 500
@@ -206,12 +246,27 @@ def register_auth_api_routes(
 
     @app.route('/api/auth/logout', methods=['POST'])
     def logout():
+        refresh_token_value = request.cookies.get('refresh_token')
+        if refresh_token_value:
+            try:
+                payload = jwt.decode(
+                    refresh_token_value, app.config['JWT_SECRET_KEY'],
+                    algorithms=['HS256'], options={"verify_exp": False},
+                )
+                jti = payload.get('jti')
+                if jti:
+                    redis_conn.delete(_refresh_key(jti))
+            except jwt.InvalidTokenError:
+                pass
+
         session.pop('user_id', None)
         session.pop('username', None)
         session.pop('role', None)
         session.pop('mfa_user_id', None)
         session.pop('mfa_pending', None)
-        return jsonify({"message": "Logged out"})
+        response = jsonify({"message": "Logged out"})
+        response.set_cookie('refresh_token', '', expires=0, httponly=True, samesite='Strict')
+        return response
 
     @app.route('/api/auth/session', methods=['GET'])
     def check_session():
@@ -339,6 +394,7 @@ def register_auth_api_routes(
             return jsonify({"error": str(error)}), 500
 
     @app.route('/api/auth/mfa/request', methods=['POST'])
+    @limiter.limit("5 per minute")
     def mfa_request_otp():
         if os.getenv('MFA_ENABLED', 'false').lower() != 'true':
             return jsonify({'message': 'MFA is not enabled'}), 200
@@ -357,8 +413,7 @@ def register_auth_api_routes(
                 return jsonify({'error': 'No phone number on file for MFA'}), 400
 
             otp = ''.join(random.choices(string.digits, k=6))
-            expires_at = datetime.now() + timedelta(minutes=5)
-            otp_store[user_id] = {'otp': otp, 'expires_at': expires_at}
+            store_otp(user_id, otp)
 
             task_queue.enqueue(
                 'services.whatsapp.send_otp',
@@ -366,11 +421,12 @@ def register_auth_api_routes(
                 otp_code=otp,
                 username=user.get('username', '')
             )
-            return jsonify({'message': 'OTP sent via WhatsApp', 'expires_in': 300})
+            return jsonify({'message': 'OTP sent via WhatsApp', 'expires_in': OTP_TTL_SECONDS})
         except Exception as error:
             return jsonify({'error': str(error)}), 500
 
     @app.route('/api/auth/mfa/verify', methods=['POST'])
+    @limiter.limit("10 per 5 minutes")
     def mfa_verify_otp():
         if os.getenv('MFA_ENABLED', 'false').lower() != 'true':
             return jsonify({'verified': True, 'message': 'MFA not enabled - auto-verified'}), 200
@@ -378,41 +434,29 @@ def register_auth_api_routes(
         try:
             data = clean_input_data(request.json or {})
             user_id = get_current_user_id() or session.get('mfa_user_id')
-            submitted_otp = data.get('otp', '')
+            submitted_otp = str(data.get('otp', ''))
             if not user_id:
                 return jsonify({'error': 'Not authenticated'}), 401
 
-            record = otp_store.get(user_id)
-            if not record:
-                return jsonify({'error': 'No OTP requested or already used'}), 400
-            if datetime.now() > record['expires_at']:
-                otp_store.pop(user_id, None)
-                return jsonify({'error': 'OTP expired'}), 400
-            if submitted_otp != record['otp']:
+            actual_otp = get_otp(user_id)
+            if not actual_otp:
+                return jsonify({'error': 'No OTP requested, already used, or expired'}), 400
+            if not hmac.compare_digest(submitted_otp, actual_otp):
                 return jsonify({'error': 'Invalid OTP'}), 401
 
             user = mongo.db.users.find_one({'_id': ObjectId(user_id), 'deleted_at': {'$exists': False}})
             if not user:
-                otp_store.pop(user_id, None)
+                clear_otp(user_id)
                 return jsonify({'error': 'User not found'}), 404
 
-            otp_store.pop(user_id, None)
+            clear_otp(user_id)
             session.pop('mfa_pending', None)
             session.pop('mfa_user_id', None)
             session['user_id'] = user_id
             session['username'] = user['username']
             session['role'] = user['role']
 
-            access_token = jwt.encode({
-                'user_id': user_id,
-                'role': user['role'],
-                'exp': datetime.utcnow() + timedelta(minutes=15)
-            }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
-
-            refresh_token = jwt.encode({
-                'user_id': user_id,
-                'exp': datetime.utcnow() + timedelta(days=7)
-            }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+            access_token, refresh_token = issue_tokens(user_id, user['role'])
 
             response = jsonify({
                 "verified": True,
@@ -423,7 +467,7 @@ def register_auth_api_routes(
                 "user_id": user_id,
                 "access_token": access_token
             })
-            response.set_cookie('refresh_token', refresh_token, httponly=True, secure=True, samesite='Strict')
+            set_refresh_cookie(response, refresh_token)
             return response
         except Exception as error:
             return jsonify({'error': str(error)}), 500

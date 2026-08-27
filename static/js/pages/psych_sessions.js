@@ -4,14 +4,6 @@ let psychNoteSessionId = '';
 let psychPatientsData = [];
 let psychEditingSessionId = '';
 
-function escapeHtml(value = '') {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 function showSuccessModal(message, isError = false) {
   if (typeof window.showToast === 'function') {

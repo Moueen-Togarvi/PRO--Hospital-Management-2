@@ -2,7 +2,6 @@ from datetime import datetime
 from pathlib import Path
 
 from flask import jsonify, request, send_file, send_from_directory
-from werkzeug.utils import secure_filename
 
 from services.site_profile import get_site_profile, save_site_profile
 
@@ -40,6 +39,7 @@ def register_system_api_routes(
         return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()}), 200
 
     @app.route('/api/db-status', methods=['GET'])
+    @role_required(['Admin'])
     def db_status():
         status = {
             "connected": check_db(),
@@ -71,6 +71,8 @@ def register_system_api_routes(
         except Exception as error:
             return jsonify({'error': str(error)}), 500
 
+    _ALLOWED_LOGO_FORMATS = {'PNG': '.png', 'JPEG': '.jpg', 'GIF': '.gif', 'WEBP': '.webp'}
+
     @app.route('/api/site-profile/logo', methods=['POST'])
     @role_required(['Admin'])
     def upload_site_logo():
@@ -81,14 +83,27 @@ def register_system_api_routes(
         if not logo_file or not logo_file.filename:
             return jsonify({'error': 'Logo file is required'}), 400
 
-        if logo_file.mimetype and not logo_file.mimetype.startswith('image/'):
-            return jsonify({'error': 'Please upload an image file'}), 400
+        # Verify the upload is actually a decodable image of an allowed
+        # format — a client-supplied mimetype/extension can't be trusted on
+        # its own (e.g. a script disguised with a .png name).
+        from PIL import Image, UnidentifiedImageError
+
+        try:
+            with Image.open(logo_file.stream) as image:
+                image.verify()
+                image_format = image.format
+        except (UnidentifiedImageError, OSError):
+            return jsonify({'error': 'Uploaded file is not a valid image'}), 400
+        finally:
+            logo_file.stream.seek(0)
+
+        if image_format not in _ALLOWED_LOGO_FORMATS:
+            return jsonify({'error': 'Only PNG, JPEG, GIF, or WEBP images are allowed'}), 400
 
         upload_dir = Path(app.root_path) / 'static' / 'uploads'
         upload_dir.mkdir(parents=True, exist_ok=True)
 
-        source_name = secure_filename(logo_file.filename)
-        suffix = Path(source_name).suffix.lower() or '.png'
+        suffix = _ALLOWED_LOGO_FORMATS[image_format]
         filename = f"site-logo-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}{suffix}"
         target = upload_dir / filename
         logo_file.save(target)

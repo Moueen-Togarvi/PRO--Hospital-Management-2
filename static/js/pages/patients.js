@@ -177,11 +177,11 @@ function renderPatientsTable(list) {
     row.innerHTML = `
       <td class="border-r border-gray-100 px-2 py-3 text-center text-[10px] font-bold ${subTextClass}">${index + 1}</td>
       <td class="w-[105px] border-r border-gray-100 px-2 py-3 text-center">
-        <div class="text-sm font-extrabold ${textClass}">${patient.name || '—'}</div>
-        <div class="mt-0.5 text-[9px] font-bold tracking-tight ${subTextClass}">${formattedPid}</div>
+        <div class="text-sm font-extrabold ${textClass}">${escapeHtml(patient.name || '—')}</div>
+        <div class="mt-0.5 text-[9px] font-bold tracking-tight ${subTextClass}">${escapeHtml(formattedPid)}</div>
       </td>
-      <td class="w-[100px] border-r border-gray-100 px-2 py-3 text-center text-[11px] font-bold ${textClass}">${patient.fatherName || '—'}</td>
-      <td class="w-[125px] whitespace-nowrap border-r border-gray-100 px-2 py-3 text-center text-[11px] font-bold ${textClass}">${patient.contactNo || patient.contact || patient.phone || '—'}</td>
+      <td class="w-[100px] border-r border-gray-100 px-2 py-3 text-center text-[11px] font-bold ${textClass}">${escapeHtml(patient.fatherName || '—')}</td>
+      <td class="w-[125px] whitespace-nowrap border-r border-gray-100 px-2 py-3 text-center text-[11px] font-bold ${textClass}">${escapeHtml(patient.contactNo || patient.contact || patient.phone || '—')}</td>
       <td class="border-r border-gray-100 px-2 py-3 text-[10px] font-black uppercase tracking-tight ${subTextClass}">${admissionStr ? formatDisplayDate(admissionStr) : '—'}</td>
       <td class="border-r border-gray-100 px-2 py-3 text-[11px] font-black ${valueClass}">Rs. ${formatNumber(monthlyFeeRaw)}</td>
       <td class="border-r border-gray-100 px-2 py-3">${stayDisplay}</td>

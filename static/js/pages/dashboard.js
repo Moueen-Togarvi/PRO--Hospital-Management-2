@@ -111,14 +111,6 @@ function isPatientDischarged(value) {
   return value === true;
 }
 
-function escapeHtml(str = '') {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 function orderColumns(columns, desiredOrder) {
   if (!Array.isArray(columns)) return [];

@@ -22,14 +22,6 @@ async function showConfirmModal(message) {
   return window.confirm(message);
 }
 
-function escapeHtml(value = '') {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 function normalizeRole(role = '') {
   return USER_ROLES.includes(role) ? role : 'General Staff';

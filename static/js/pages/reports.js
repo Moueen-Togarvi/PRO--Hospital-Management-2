@@ -86,14 +86,6 @@ const printableSymbolMap = {
   wc: 'WC',
 };
 
-function escapeHtml(value = '') {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 function orderColumns(columns, desiredOrder) {
   const map = new Map((columns || []).map((column) => [column.key, column]));

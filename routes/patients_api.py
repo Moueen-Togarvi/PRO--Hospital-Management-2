@@ -5,6 +5,7 @@ from datetime import datetime
 from db import ObjectId
 from flask import jsonify, request, session
 from werkzeug.security import generate_password_hash
+from utils import safe_int_amount
 
 
 def serialize_patient_document(patient_doc, decrypt_data):
@@ -186,7 +187,7 @@ def register_patient_api_routes(
                 )
 
             try:
-                initial_received = int(str(data.get('receivedAmount', '0')).replace(',', ''))
+                initial_received = safe_int_amount(data.get('receivedAmount'))
                 if initial_received > 0:
                     mongo.db.expenses.insert_one({
                         'type': 'incoming',

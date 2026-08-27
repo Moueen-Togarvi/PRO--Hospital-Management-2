@@ -1,10 +1,11 @@
 from flask import redirect, session, url_for
 
+from db import ObjectId
+
 
 class PageContext:
-    def __init__(self, mongo, object_id_cls):
+    def __init__(self, mongo):
         self.mongo = mongo
-        self.object_id_cls = object_id_cls
         self.dashboard_roles = {"Admin", "Doctor", "Psychologist", "Canteen", "Staff"}
         self.hospital_page_roles = {
             "Admin",
@@ -73,7 +74,7 @@ class PageContext:
 
         try:
             user = self.mongo.db.users.find_one(
-                {"_id": self.object_id_cls(user_id), "deleted_at": {"$exists": False}}
+                {"_id": ObjectId(user_id), "deleted_at": {"$exists": False}}
             )
         except Exception:
             user = None

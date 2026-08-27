@@ -2,6 +2,7 @@ from datetime import datetime
 
 from db import ObjectId
 from flask import jsonify, request, session
+from utils import patient_financial_summary
 
 
 def register_family_api_routes(
@@ -116,38 +117,12 @@ def register_family_api_routes(
 
                 financial_summary = {}
                 try:
-                    admission_date = patient.get('admissionDate')
-                    days_elapsed = 0
-                    if admission_date:
-                        if isinstance(admission_date, str):
-                            admission_dt = datetime.fromisoformat(admission_date.replace('Z', '+00:00'))
-                        else:
-                            admission_dt = admission_date
-                        days_elapsed = max(0, (datetime.now() - admission_dt.replace(tzinfo=None)).days)
-
-                    monthly_fee_raw = int(str(patient.get('monthlyFee', '0')).replace(',', '') or '0')
-                    prorated_fee = int((monthly_fee_raw / 30.0) * max(days_elapsed, 1))
-
                     canteen_agg = list(mongo.db.canteen_sales.aggregate([
                         {'$match': {'patient_id': ObjectId(patient_id)}},
                         {'$group': {'_id': None, 'total': {'$sum': '$amount'}}}
                     ]))
                     canteen_total = canteen_agg[0]['total'] if canteen_agg else 0
-                    laundry = int(patient.get('laundryAmount', 0) or 0) if patient.get('laundryStatus') else 0
-                    received = int(str(patient.get('receivedAmount', '0')).replace(',', '') or '0')
-                    total_charges = prorated_fee + canteen_total + laundry
-                    balance_due = total_charges - received
-
-                    financial_summary = {
-                        'days_elapsed': days_elapsed,
-                        'monthly_fee': monthly_fee_raw,
-                        'prorated_fee': prorated_fee,
-                        'canteen_total': canteen_total,
-                        'laundry_amount': laundry,
-                        'total_charges': total_charges,
-                        'received_amount': received,
-                        'balance_due': balance_due,
-                    }
+                    financial_summary = patient_financial_summary(patient, canteen_total)
                 except Exception as error:
                     print(f"Family financial calc error: {error}")
 

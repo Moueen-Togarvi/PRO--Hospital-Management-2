@@ -14,7 +14,7 @@ from flask_talisman import Talisman
 from flask_cors import CORS
 import jwt
 import redis
-from rq import Queue
+from rq import Queue, Retry
 load_dotenv()
 from routes.admission_page import register_admission_page_routes
 from routes.accounts_page import register_account_page_routes
@@ -52,17 +52,48 @@ from routes.users_page import register_user_page_routes
 from routes.system_api import register_system_api_routes
 from services.encryption import encrypt_data, decrypt_data
 from services.site_profile import get_site_profile
-
-app = Flask(__name__)
-CORS(app)
-Talisman(app, content_security_policy=None, force_https=False)  # Disabled force_https for local development
-
+from utils import calculate_prorated_fee
 
 def _env_bool(name, default=True):
     value = os.environ.get(name)
     if value is None:
         return default
     return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
+FORCE_HTTPS = _env_bool("FORCE_HTTPS", False)
+_cors_origins_raw = os.environ.get("CORS_ALLOWED_ORIGINS", "").strip()
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _cors_origins_raw.split(",") if origin.strip()]
+
+app = Flask(__name__)
+if CORS_ALLOWED_ORIGINS:
+    CORS(app, origins=CORS_ALLOWED_ORIGINS, supports_credentials=True)
+# else: no cross-origin API access is enabled. This app's own frontend calls
+# its own API same-origin, so CORS is opt-in only for a known external client.
+
+_CSP = {
+    "default-src": "'self'",
+    "img-src": "'self' data: https:",
+    "font-src": "'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com",
+    "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
+    # Tailwind's Play CDN and this app's many inline onclick=/<script> blocks
+    # require 'unsafe-inline'; a strict nonce-based CSP would need those
+    # refactored first (tracked separately, not a drop-in change).
+    "script-src": "'self' 'unsafe-inline' https://cdn.tailwindcss.com",
+    "object-src": "'none'",
+    "frame-ancestors": "'self'",
+}
+Talisman(
+    app,
+    content_security_policy=_CSP,
+    force_https=FORCE_HTTPS,
+    strict_transport_security=FORCE_HTTPS,
+)
+
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "16")) * 1024 * 1024
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = FORCE_HTTPS
 
 
 def _rate_limit_defaults():
@@ -72,11 +103,25 @@ def _rate_limit_defaults():
     return [limit.strip() for limit in raw_limits.split(",") if limit.strip()]
 
 
+redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+redis_conn = redis.from_url(redis_url)
+class RetryQueue(Queue):
+    """Applies a default retry policy to every enqueued job (transient
+    WhatsApp/PDF failures previously just failed silently with no re-queue),
+    without needing every call site to remember to pass one."""
+
+    def enqueue(self, f, *args, **kwargs):
+        kwargs.setdefault('retry', Retry(max=3, interval=[10, 30, 60]))
+        return super().enqueue(f, *args, **kwargs)
+
+
+task_queue = RetryQueue(connection=redis_conn)
+
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=_rate_limit_defaults(),
-    storage_uri="memory://",
+    storage_uri=redis_url,
     enabled=_env_bool("RATE_LIMIT_ENABLED", True),
 )
 
@@ -86,7 +131,13 @@ if not database_url:
     print("WARNING: DATABASE_URL environment variable is not set. Database connection will fail.")
 app.config["MONGO_URI"] = database_url
 
-secret_key = os.environ.get("SECRET_KEY", "06e4b4738ab81f94277a7216b5e79fb24b339f28a6a131391d8d6f8f0a295dc1")
+secret_key = os.environ.get("SECRET_KEY", "").strip()
+if not secret_key:
+    raise RuntimeError(
+        "SECRET_KEY environment variable is not set. Refusing to start with an "
+        "insecure default — generate one with `python -c \"import secrets; "
+        "print(secrets.token_hex(32))\"` and set it in .env."
+    )
 app.config["SECRET_KEY"] = secret_key
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", secret_key)
 app.config["GMAIL_USER"] = os.environ.get("GMAIL_USER")
@@ -100,10 +151,6 @@ try:
 except Exception as e:
     print(f"CRITICAL: Database initialization failed: {type(e).__name__} - {e}")
     mongo = None
-
-redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-redis_conn = redis.from_url(redis_url)
-task_queue = Queue(connection=redis_conn)
 
 serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 
@@ -137,20 +184,34 @@ def clean_input_data(data):
     return cleaned
 
 def ensure_initial_admin():
-    """Checks for and creates the default admin user 'ImranSaab' on first run."""
+    """Checks for and creates the default admin user 'ImranSaab' on first run.
+
+    The initial password comes from ADMIN_INITIAL_PASSWORD if set; otherwise a
+    random one is generated and printed once so no well-known credential ever
+    reaches a real deployment.
+    """
     if check_db():
         if mongo.db.users.count_documents({}) == 0:
-            # Create ImranSaab as the Admin
+            import secrets
+            initial_password = os.environ.get('ADMIN_INITIAL_PASSWORD', '').strip()
+            generated = not initial_password
+            if generated:
+                initial_password = secrets.token_urlsafe(12)
+
             admin_user = {
                 'username': 'ImranSaab',
-                'password': generate_password_hash('password123'),
+                'password': generate_password_hash(initial_password),
                 'role': 'Admin',
                 'name': 'Imran Khan (Admin)',
                 'email': os.environ.get('ADMIN_EMAIL', 'admin@example.com').strip().lower(),
                 'created_at': datetime.now()
             }
             mongo.db.users.insert_one(admin_user)
-            print("Initial Admin user 'ImranSaab' created.")
+            if generated:
+                print(f"Initial Admin user 'ImranSaab' created. Generated password: {initial_password}")
+                print("Set ADMIN_INITIAL_PASSWORD in .env to control this instead. Change this password after first login.")
+            else:
+                print("Initial Admin user 'ImranSaab' created with ADMIN_INITIAL_PASSWORD from environment.")
 
 def create_indices():
     """Ensure essential database indices exist for performance."""
@@ -323,39 +384,23 @@ def role_required(roles):
         def wrapper(*args, **kwargs):
             if not check_db(): return jsonify({"error": "Database not initialized"}), 500
             user_id = get_current_user_id()
-            user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
-            
-            # Diagnostic print for debugging 403s
+            try:
+                user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+            except Exception:
+                user = None
             current_role = user.get('role') if user else 'None'
-            print(f"[RBAC Debug] User: {user.get('username') if user else 'Unknown'}, Role: {current_role}, Required: {roles}")
-            
+
+            if app.debug:
+                print(f"[RBAC Debug] User: {user.get('username') if user else 'Unknown'}, Role: {current_role}, Required: {roles}")
+
             # Exclude deleted users
             if user and not user.get('deleted_at') and current_role in roles:
                 return f(*args, **kwargs)
-            
-            return jsonify({"error": "Access Denied", "debug_role": current_role}), 403
+
+            return jsonify({"error": "Access Denied"}), 403
         wrapper.__name__ = f.__name__
         return wrapper
     return decorator
-
-def calculate_prorated_fee(monthly_fee, days_elapsed):
-    """
-    Calculate prorated fee based purely on days elapsed.
-    Formula: (monthly_fee / 30) * days_elapsed.
-    This ensures patients are charged fairly per day based on their set monthly fee,
-    calculating properly for both short stays and long stays.
-    """
-    try:
-        # Parse monthly_fee to handle string values with commas
-        if isinstance(monthly_fee, str):
-            monthly_fee = int(monthly_fee.replace(',', '') or '0')
-        else:
-            monthly_fee = int(monthly_fee or 0)
-        
-        per_day_rate = monthly_fee / 30.0
-        return int(per_day_rate * max(days_elapsed, 1))  # At least 1 day charge
-    except (ValueError, TypeError):
-        return 0
 
 
 # ============================================================
@@ -397,7 +442,7 @@ def calculate_prorated_fee(monthly_fee, days_elapsed):
 #    - All financial fields stored as strings with commas, parsed as integers
 # ============================================================
 
-page_context = register_page_routes(app, mongo, ObjectId)
+page_context = register_page_routes(app, mongo)
 register_auth_api_routes(
     app,
     mongo,
@@ -410,6 +455,7 @@ register_auth_api_routes(
     send_password_reset_email,
     get_current_user_id,
     login_required,
+    redis_conn,
 )
 register_admission_page_routes(app, page_context)
 register_account_page_routes(app, page_context)

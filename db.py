@@ -146,6 +146,40 @@ def _table_columns(table):
     return columns
 
 
+_unique_index_cache = {}
+
+
+def _unique_index_column_sets(table):
+    """Non-partial unique indexes/constraints (including the PK) for `table`,
+    as a list of frozensets of column names. Used to detect when an upsert's
+    filter keys exactly correspond to a real unique key, so it can be done
+    as one atomic `INSERT ... ON CONFLICT DO UPDATE` instead of a
+    check-then-act UPDATE/INSERT pair that races under concurrent requests.
+    Partial indexes are excluded since ON CONFLICT inference for those needs
+    a matching WHERE predicate this generic path doesn't attempt.
+    """
+    if table in _unique_index_cache:
+        return _unique_index_cache[table]
+    with _conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT ix.indexrelid AS idx,
+                   array_agg(a.attname ORDER BY array_position(ix.indkey, a.attnum)) AS cols
+            FROM pg_index ix
+            JOIN pg_class t ON t.oid = ix.indrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+            WHERE n.nspname = 'public' AND t.relname = %s
+              AND ix.indisunique = true AND ix.indpred IS NULL
+            GROUP BY ix.indexrelid
+            """,
+            (table,),
+        ).fetchall()
+    result = [frozenset(row["cols"]) for row in rows]
+    _unique_index_cache[table] = result
+    return result
+
+
 def _is_jsonb(table, column):
     return _table_columns(table).get(column) == "jsonb"
 
@@ -359,6 +393,9 @@ def _split_update(table, update):
 
 # ── cursor ──────────────────────────────────────────────────────────────────
 
+DEFAULT_QUERY_CAP = 5000
+
+
 class Cursor:
     def __init__(self, table, filter_dict, projection=None):
         self._table = table
@@ -391,8 +428,7 @@ class Cursor:
                 col_sql = _quote(field) if field in _table_columns(self._table) else "(%s->>'%s')" % (_quote("data"), field)
                 order_parts.append("%s %s" % (col_sql, "DESC" if direction == -1 else "ASC"))
             sql += " ORDER BY " + ", ".join(order_parts)
-        if self._limit is not None:
-            sql += " LIMIT %d" % self._limit
+        sql += " LIMIT %d" % (self._limit if self._limit is not None else DEFAULT_QUERY_CAP)
         with _conn() as conn:
             rows = conn.execute(sql, params).fetchall()
         self._results = [_apply_projection(_row_to_doc(row), self._projection) for row in rows]
@@ -475,10 +511,83 @@ class Collection:
                 ids.append(self._insert_row(conn, doc))
         return InsertManyResult(ids)
 
+    def _upsert_insert_doc(self, filter, update):
+        insert_doc = {}
+        for key, value in (filter or {}).items():
+            if key.startswith("$") or isinstance(value, dict):
+                continue
+            insert_doc[key] = value
+        for key, value in (update.get("$set") or {}).items():
+            if "." in key:
+                col, subkey = key.split(".", 1)
+                insert_doc.setdefault(col, {})
+                if isinstance(insert_doc[col], dict):
+                    insert_doc[col][subkey] = value
+            else:
+                insert_doc[key] = value
+        for key, value in (update.get("$setOnInsert") or {}).items():
+            insert_doc.setdefault(key, value)
+        for key, value in (update.get("$inc") or {}).items():
+            insert_doc.setdefault(key, value)
+        return insert_doc
+
+    def _upsert_on_conflict(self, conflict_cols, filter, update, set_exprs, set_params):
+        """Atomic upsert via INSERT ... ON CONFLICT DO UPDATE — avoids the
+        check-then-act race of the UPDATE-then-INSERT fallback."""
+        insert_doc = self._upsert_insert_doc(filter, update)
+        columns = _table_columns(self.name)
+        if "_id" not in insert_doc or insert_doc["_id"] is None:
+            insert_doc["_id"] = new_id()
+        else:
+            insert_doc["_id"] = str(insert_doc["_id"])
+
+        row_values = {}
+        extra = {}
+        for key, value in insert_doc.items():
+            if key in columns:
+                row_values[key] = _wrap_value(self.name, key, value)
+            else:
+                extra[key] = _normalize(value)
+        if "data" in columns and extra:
+            row_values["data"] = _jsonb(extra)
+
+        cols = list(row_values.keys())
+        insert_sql = "INSERT INTO %s (%s) VALUES (%s)" % (
+            self.name,
+            ", ".join(_quote(c) for c in cols),
+            ", ".join(["%s"] * len(cols)),
+        )
+        conflict_target = ", ".join(_quote(c) for c in sorted(conflict_cols))
+        sql = "%s ON CONFLICT (%s) DO UPDATE SET %s RETURNING *, (xmax = 0) AS inserted" % (
+            insert_sql, conflict_target, ", ".join(set_exprs),
+        )
+        all_params = [row_values[c] for c in cols] + set_params
+        with _conn() as conn:
+            row = conn.execute(sql, all_params).fetchone()
+        was_insert = row.pop("inserted", False)
+        return UpdateResult(
+            0 if was_insert else 1,
+            0 if was_insert else 1,
+            upserted_id=row["_id"] if was_insert else None,
+        )
+
     def _do_update(self, filter, update, upsert=False):
         set_exprs, params = _split_update(self.name, update)
         if not set_exprs:
             return UpdateResult(0, 0)
+
+        if upsert:
+            plain_filter_keys = {
+                key for key, value in (filter or {}).items()
+                if not key.startswith("$") and not isinstance(value, dict)
+            }
+            conflict_cols = next(
+                (u for u in _unique_index_column_sets(self.name) if u.issubset(plain_filter_keys)),
+                None,
+            )
+            if conflict_cols:
+                return self._upsert_on_conflict(conflict_cols, filter, update, set_exprs, params)
+
         where_params = []
         where_sql = _build_where(self.name, filter, where_params)
         sql = "UPDATE %s SET %s WHERE %s" % (self.name, ", ".join(set_exprs), where_sql)
@@ -487,23 +596,11 @@ class Collection:
             cur = conn.execute(sql, all_params)
             matched = cur.rowcount
             if matched == 0 and upsert:
-                insert_doc = {}
-                for key, value in (filter or {}).items():
-                    if key.startswith("$") or isinstance(value, dict):
-                        continue
-                    insert_doc[key] = value
-                for key, value in (update.get("$set") or {}).items():
-                    if "." in key:
-                        col, subkey = key.split(".", 1)
-                        insert_doc.setdefault(col, {})
-                        if isinstance(insert_doc[col], dict):
-                            insert_doc[col][subkey] = value
-                    else:
-                        insert_doc[key] = value
-                for key, value in (update.get("$setOnInsert") or {}).items():
-                    insert_doc.setdefault(key, value)
-                for key, value in (update.get("$inc") or {}).items():
-                    insert_doc.setdefault(key, value)
+                # No unique key models this upsert's filter shape, so fall back
+                # to best-effort UPDATE-then-INSERT (races under true
+                # concurrent duplicate submissions; every known call site in
+                # this codebase is covered by the atomic path above instead).
+                insert_doc = self._upsert_insert_doc(filter, update)
                 new_id_val = self._insert_row(conn, insert_doc)
                 return UpdateResult(0, 0, upserted_id=new_id_val)
         return UpdateResult(matched, matched)
@@ -567,7 +664,12 @@ class Collection:
             row = conn.execute(sql, insert_params + update_params).fetchone()
         return _row_to_doc(row)
 
-    # ── aggregate (Python-side $match + $group, matching this codebase's usage) ──
+    # ── aggregate ($match + $group) ──────────────────────────────────────────
+    # $sum-only groupings (the common case: totals/counts by patient, date,
+    # etc.) are pushed down to a real SQL GROUP BY so they don't have to
+    # fetch every matching row. $push groupings (collecting whole sub-docs
+    # per group, e.g. "items per patient today") still fetch matching rows
+    # and group them in Python, since that shape has no SQL equivalent here.
 
     def aggregate(self, pipeline):
         combined_filter = {}
@@ -578,12 +680,63 @@ class Collection:
             elif "$group" in stage:
                 group_stage = stage["$group"]
 
-        docs = list(self.find(combined_filter))
         if group_stage is None:
-            return docs
+            return list(self.find(combined_filter))
 
-        group_id_spec = group_stage.get("_id")
         accumulators = {k: v for k, v in group_stage.items() if k != "_id"}
+        if not any("$push" in spec for spec in accumulators.values()):
+            sql_result = self._aggregate_sql(combined_filter, group_stage, accumulators)
+            if sql_result is not None:
+                return sql_result
+
+        return self._aggregate_python(list(self.find(combined_filter)), group_stage, accumulators)
+
+    def _aggregate_sql(self, combined_filter, group_stage, accumulators):
+        """Returns the grouped/summed rows via a real SQL query, or None if
+        the group/accumulator shape isn't one this can translate (caller
+        falls back to Python-side grouping in that case)."""
+        columns = _table_columns(self.name)
+        group_id_spec = group_stage.get("_id")
+
+        if group_id_spec is None:
+            group_col_sql = None
+        elif isinstance(group_id_spec, str) and group_id_spec.startswith("$"):
+            field = group_id_spec[1:]
+            group_col_sql = _quote(field) if field in columns else "(%s->>'%s')" % (_quote("data"), field)
+        elif isinstance(group_id_spec, dict) and "$dateToString" in group_id_spec:
+            spec = group_id_spec["$dateToString"]
+            field = spec.get("date")
+            field_name = field[1:] if isinstance(field, str) and field.startswith("$") else field
+            if spec.get("format", "%Y-%m-%d") != "%Y-%m-%d" or field_name not in columns:
+                return None
+            group_col_sql = "to_char(%s, 'YYYY-MM-DD')" % _quote(field_name)
+        else:
+            return None
+
+        select_parts = ["%s AS _id" % (group_col_sql if group_col_sql else "NULL")]
+        for name, spec in accumulators.items():
+            if "$sum" not in spec:
+                return None
+            operand = spec["$sum"]
+            if operand == 1:
+                select_parts.append("COUNT(*) AS %s" % _quote(name))
+                continue
+            field_name = operand[1:] if isinstance(operand, str) and operand.startswith("$") else None
+            if not field_name or field_name not in columns:
+                return None
+            select_parts.append("COALESCE(SUM(%s), 0) AS %s" % (_quote(field_name), _quote(name)))
+
+        params = []
+        where_sql = _build_where(self.name, combined_filter, params)
+        sql = "SELECT %s FROM %s WHERE %s" % (", ".join(select_parts), self.name, where_sql)
+        if group_col_sql:
+            sql += " GROUP BY %s" % group_col_sql
+        with _conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def _aggregate_python(self, docs, group_stage, accumulators):
+        group_id_spec = group_stage.get("_id")
 
         def group_key(doc):
             if group_id_spec is None:

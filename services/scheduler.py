@@ -27,13 +27,14 @@ def run_billing_job():
     """
     try:
         import redis
-        from rq import Queue
+        from rq import Queue, Retry
         from db import Mongo
 
         redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 
         conn = redis.from_url(redis_url)
-        task_queue = Queue(connection=conn)
+        task_queue = Queue(connection=conn, default_timeout=180)
+        retry_policy = Retry(max=3, interval=[10, 30, 60])
         db = Mongo().db
 
         now = datetime.now()
@@ -58,7 +59,8 @@ def run_billing_job():
                 patient_id=str(patient['_id']),
                 phone_number=phone,
                 month_year=month_year,
-                job_timeout=120
+                job_timeout=120,
+                retry=retry_policy,
             )
             queued += 1
 
@@ -77,13 +79,14 @@ def run_daily_report_job():
     """
     try:
         import redis
-        from rq import Queue
+        from rq import Queue, Retry
         from db import Mongo
 
         redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 
         conn = redis.from_url(redis_url)
-        task_queue = Queue(connection=conn)
+        task_queue = Queue(connection=conn, default_timeout=180)
+        retry_policy = Retry(max=3, interval=[10, 30, 60])
         db = Mongo().db
 
         today = datetime.now().date().isoformat()
@@ -106,7 +109,8 @@ def run_daily_report_job():
                     patient_id=str(pid),
                     phone_number=str(phone).strip(),
                     report_date=today,
-                    job_timeout=60
+                    job_timeout=60,
+                    retry=retry_policy,
                 )
                 queued += 1
 
