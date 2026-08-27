@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify, session, url_for
-from flask_pymongo import PyMongo
-from bson.objectid import ObjectId
+from db import Mongo, ObjectId
 from datetime import datetime
 from werkzeug.security import generate_password_hash
 from itsdangerous import URLSafeTimedSerializer
@@ -82,25 +81,10 @@ limiter = Limiter(
 )
 
 # --- CONFIGURATION ---
-mongo_uri = os.environ.get("MONGO_URI")
-if mongo_uri:
-    mongo_uri = mongo_uri.strip()
-    # Handle accidental label inclusion (e.g., "MONGO_URI: mongodb+srv://...")
-    if mongo_uri.lower().startswith("mongo_uri:"):
-        mongo_uri = mongo_uri[10:].strip()
-    elif mongo_uri.lower().startswith("mongodb:"):
-        # This is already a valid scheme, skip
-        pass
-    elif ":" in mongo_uri and not mongo_uri.startswith("mongodb"):
-        # If there's a colon but it doesn't look like a scheme, it might be a label we missed
-        parts = mongo_uri.split(":", 1)
-        if len(parts) > 1 and "mongodb" in parts[1].lower():
-            mongo_uri = parts[1].strip()
-else:
-    # Fallback for local dev if .env is missing, but Render will need this set
-    print("WARNING: MONGO_URI environment variable is not set. Database connection will fail.")
-    mongo_uri = "mongodb://localhost:27017/hospital_management" 
-app.config["MONGO_URI"] = mongo_uri
+database_url = os.environ.get("DATABASE_URL", "").strip()
+if not database_url:
+    print("WARNING: DATABASE_URL environment variable is not set. Database connection will fail.")
+app.config["MONGO_URI"] = database_url
 
 secret_key = os.environ.get("SECRET_KEY", "06e4b4738ab81f94277a7216b5e79fb24b339f28a6a131391d8d6f8f0a295dc1")
 app.config["SECRET_KEY"] = secret_key
@@ -110,19 +94,12 @@ app.config["GMAIL_APP_PASSWORD"] = os.environ.get("GMAIL_APP_PASSWORD")
 app.config["PASSWORD_RESET_EXPIRY_MINUTES"] = int(os.environ.get("PASSWORD_RESET_EXPIRY_MINUTES", "30"))
 
 try:
-    mongo = PyMongo(
-        app,
-        serverSelectionTimeoutMS=int(os.environ.get("MONGO_SERVER_SELECTION_TIMEOUT_MS", "3000")),
-    )
-    with app.app_context():
-        mongo.cx.admin.command('ping')
-    print("SUCCESS: Connected to MongoDB.")
+    mongo = Mongo()
+    mongo.cx.admin.command('ping')
+    print("SUCCESS: Connected to PostgreSQL (Neon).")
 except Exception as e:
-    if 'mongo' in globals():
-        print(f"WARNING: MongoDB ping failed at startup: {type(e).__name__} - {e}")
-    else:
-        print(f"CRITICAL: MongoDB initialization failed: {type(e).__name__} - {e}")
-        mongo = None
+    print(f"CRITICAL: Database initialization failed: {type(e).__name__} - {e}")
+    mongo = None
 
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 redis_conn = redis.from_url(redis_url)

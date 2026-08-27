@@ -28,14 +28,13 @@ def run_billing_job():
     try:
         import redis
         from rq import Queue
-        from pymongo import MongoClient
+        from db import Mongo
 
         redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-        mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/hospital_management')
 
         conn = redis.from_url(redis_url)
         task_queue = Queue(connection=conn)
-        db = MongoClient(mongo_uri).get_default_database()
+        db = Mongo().db
 
         now = datetime.now()
         month_year = now.strftime('%B %Y')
@@ -79,14 +78,13 @@ def run_daily_report_job():
     try:
         import redis
         from rq import Queue
-        from pymongo import MongoClient
+        from db import Mongo
 
         redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-        mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/hospital_management')
 
         conn = redis.from_url(redis_url)
         task_queue = Queue(connection=conn)
-        db = MongoClient(mongo_uri).get_default_database()
+        db = Mongo().db
 
         today = datetime.now().date().isoformat()
 

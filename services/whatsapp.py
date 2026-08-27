@@ -7,24 +7,22 @@ import os
 import json
 import logging
 from datetime import datetime
-from pymongo import MongoClient
 from dotenv import load_dotenv
 
 load_dotenv()
 
+from db import Mongo
+
 logger = logging.getLogger(__name__)
 
 # ── Database (worker process has its own connection) ──────────────────────────
-MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/hospital_management')
-_client = None
-_db = None
+_mongo = None
 
 def _get_db():
-    global _client, _db
-    if _db is None:
-        _client = MongoClient(MONGO_URI)
-        _db = _client.get_default_database()
-    return _db
+    global _mongo
+    if _mongo is None:
+        _mongo = Mongo()
+    return _mongo.db
 
 
 # ── Provider Implementations ──────────────────────────────────────────────────

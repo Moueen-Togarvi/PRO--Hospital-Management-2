@@ -24,11 +24,9 @@ def task_send_billing(patient_id: str, phone_number: str, month_year: str):
     Generate billing PDF for a patient and send via WhatsApp.
     Queued by the monthly_billing scheduler job.
     """
-    from pymongo import MongoClient
-    from bson.objectid import ObjectId
+    from db import Mongo, ObjectId
 
-    mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/hospital_management')
-    db = MongoClient(mongo_uri).get_default_database()
+    db = Mongo().db
 
     try:
         patient = db.patients.find_one({'_id': ObjectId(patient_id)})
@@ -38,7 +36,7 @@ def task_send_billing(patient_id: str, phone_number: str, month_year: str):
 
         # Calculate financial summary
         from datetime import datetime
-        from bson.objectid import ObjectId as OID
+        from db import ObjectId as OID
 
         admission_date = patient.get('admissionDate')
         days_elapsed = 0
@@ -142,11 +140,9 @@ def task_send_daily_report(patient_id: str, phone_number: str, report_date: str)
     Fetch today's daily report for a patient and send summary to family via WhatsApp.
     Queued by the daily_report scheduler job.
     """
-    from pymongo import MongoClient
-    from bson.objectid import ObjectId
+    from db import Mongo, ObjectId
 
-    mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/hospital_management')
-    db = MongoClient(mongo_uri).get_default_database()
+    db = Mongo().db
 
     try:
         patient = db.patients.find_one({'_id': ObjectId(patient_id)}, {'name': 1})

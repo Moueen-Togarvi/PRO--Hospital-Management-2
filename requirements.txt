@@ -1,7 +1,6 @@
 Flask
-Flask-PyMongo
-pymongo[srv]
-dnspython
+psycopg[binary]
+psycopg_pool
 pandas
 openpyxl
 python-dotenv

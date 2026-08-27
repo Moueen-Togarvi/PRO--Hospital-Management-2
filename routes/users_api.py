@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from bson.objectid import ObjectId
+from db import ObjectId
 from flask import jsonify, request
 from werkzeug.security import generate_password_hash
 

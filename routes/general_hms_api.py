@@ -1,8 +1,8 @@
 from datetime import date, datetime
 
-from bson.objectid import ObjectId
+from db import ObjectId
 from flask import jsonify, request, session
-from pymongo import ReturnDocument
+from db import ReturnDocument
 
 
 HMS_ROLES = [
